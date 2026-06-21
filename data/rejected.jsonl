@@ -1,9 +1,0 @@
-{"ts": "2026-06-21T05:30:05+00:00", "reason": "not_public", "full_name": "foo/bar", "private": true, "visibility": "private", "source": "gh"}
-{"ts": "2026-06-21T05:30:05+00:00", "reason": "not_in_allowlist", "full_name": "not/listed"}
-{"ts": "2026-06-21T05:30:12+00:00", "reason": "not_public", "full_name": "moshevels4/DARIS", "operation": "check", "private": null, "visibility": null, "source": "default-deny"}
-{"ts": "2026-06-21T05:30:16+00:00", "reason": "not_public", "full_name": "moshevels4/moshevels4", "operation": "scan_own", "private": null, "visibility": null, "source": "default-deny"}
-{"ts": "2026-06-21T05:30:16+00:00", "reason": "not_public", "full_name": "moshevels4/DARIS", "operation": "scan_own", "private": null, "visibility": null, "source": "default-deny"}
-{"ts": "2026-06-21T05:30:17+00:00", "reason": "not_public", "full_name": "moshevels4/power-papers-daily", "operation": "scan_own", "private": null, "visibility": null, "source": "default-deny"}
-{"ts": "2026-06-21T05:30:17+00:00", "reason": "not_public", "full_name": "moshevels4/dis_daily_agent", "operation": "scan_own", "private": null, "visibility": null, "source": "default-deny"}
-{"ts": "2026-06-21T05:30:17+00:00", "reason": "not_public", "full_name": "moshevels4/moshevels4", "operation": "update_readme", "private": null, "visibility": null, "source": "default-deny"}
-{"ts": "2026-06-21T05:30:17+00:00", "reason": "profile_guard_failed", "repo": "moshevels4/moshevels4", "error": "[SECURITY_SKIP] repo=moshevels4/moshevels4 reason=not_public operation=update_readme"}

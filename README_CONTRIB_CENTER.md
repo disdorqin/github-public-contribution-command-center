@@ -88,7 +88,7 @@ workflow, and is the only token the contrib center ever sees.
 # from the repo root
 pip install -e .
 gh auth login                                    # one-time, on your machine
-python -m contrib_center.main check-visibility moshevels4/DARIS
+python -m contrib_center.main check-visibility disdorqin/DARIS
 python -m contrib_center.main run --mode safe
 ```
 
@@ -102,7 +102,7 @@ Outputs:
 - `data/state.sqlite` — daily counters
 - The fenced block `<!-- DAILY-BOT:START --> ... <!-- DAILY-BOT:END -->`
   is updated in the README of the profile repo (currently
-  `moshevels4/dis_daily_agent` or `moshevels4/moshevels4`, whichever is
+  `disdorqin/dis_daily_agent` or `disdorqin/disdorqin`, whichever is
   marked `purpose: GitHub Profile README` in `config/public_repos.yml`).
 
 ## How to run in GitHub Actions
@@ -130,7 +130,7 @@ To enable it:
 After running:
 
 ```bash
-python -m contrib_center.main check-visibility moshevels4/DARIS
+python -m contrib_center.main check-visibility disdorqin/DARIS
 python -m contrib_center.main run --mode safe
 ```
 

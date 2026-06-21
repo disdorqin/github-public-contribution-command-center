@@ -186,3 +186,8 @@ pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
 
+
+# contrib_center generated files (not commited — see data/.gitkeep, reports/.gitkeep)
+data/*.jsonl
+data/*.sqlite
+data/*.db

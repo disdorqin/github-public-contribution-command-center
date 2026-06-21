@@ -43,7 +43,7 @@ def auth_status() -> dict[str, Any]:
 def search_issues(query: str, limit: int = 30) -> list[dict[str, Any]]:
     """Search PUBLIC open issues. NO repo arg means we are browsing the
     global issue feed. We still enforce that each returned issue's
-    repository is in the public allowlist or has a non-moshevels4 owner
+    repository is in the public allowlist or has a non-disdorqin owner
     that is publicly readable.
 
     For Safe Mode v1 we accept ANY public issue from external repos; the

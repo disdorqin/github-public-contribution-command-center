@@ -1,8 +1,8 @@
-owner: moshevels4
+owner: disdorqin
 
 repositories:
-  - name: moshevels4
-    full_name: moshevels4/moshevels4
+  - name: disdorqin
+    full_name: disdorqin/disdorqin
     purpose: GitHub Profile README
     allow:
       update_readme: true
@@ -11,7 +11,7 @@ repositories:
       push_commit: true
 
   - name: DARIS
-    full_name: moshevels4/DARIS
+    full_name: disdorqin/DARIS
     purpose: 自有项目
     allow:
       update_readme: true
@@ -20,7 +20,7 @@ repositories:
       push_commit: false
 
   - name: power-papers-daily
-    full_name: moshevels4/power-papers-daily
+    full_name: disdorqin/power-papers-daily
     purpose: 电力论文日报系统
     allow:
       update_readme: true
@@ -29,7 +29,7 @@ repositories:
       push_commit: false
 
   - name: dis_daily_agent
-    full_name: moshevels4/dis_daily_agent
+    full_name: disdorqin/dis_daily_agent
     purpose: GitHub Profile README
     allow:
       update_readme: true
