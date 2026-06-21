@@ -1,9 +1,12 @@
 """Thin wrapper around the ``gh`` CLI.
 
 Every method that touches a repo requires the repo's full name and
-routes through the public-only guard. NO method in this module performs
-a network call before ``guard_repo_operation`` has approved the target
-repo.
+routes through the appropriate public-only guard.
+
+* Own-repo operations  → ``guard_own_repo_operation`` (allowlist + public proof).
+* External search results are NOT pre-filtered here; the caller
+  (``issue_scout``) applies ``guard_external_public_repo_read``
+  before generating any patch.
 """
 
 from __future__ import annotations
@@ -41,15 +44,10 @@ def auth_status() -> dict[str, Any]:
 
 
 def search_issues(query: str, limit: int = 30) -> list[dict[str, Any]]:
-    """Search PUBLIC open issues. NO repo arg means we are browsing the
-    global issue feed. We still enforce that each returned issue's
-    repository is in the public allowlist or has a non-disdorqin owner
-    that is publicly readable.
+    """Search PUBLIC open issues (global feed).
 
-    For Safe Mode v1 we accept ANY public issue from external repos; the
-    downstream score/filter step is what gates whether the bot does
-    anything with it. The crucial invariant is that we never WRITE to
-    such repos — see bots/pr_agent.py and bots/issue_scout.py.
+    Each returned issue is later vetted by ``issue_scout`` through
+    ``guard_external_public_repo_read`` before any patch work.
     """
     rc, out, err = _gh(
         [
@@ -74,8 +72,11 @@ def search_issues(query: str, limit: int = 30) -> list[dict[str, Any]]:
         return []
 
 
-def list_own_repo_issues(full_name: str, policy: Policy, limit: int = 20) -> list[dict[str, Any]]:
-    visibility_guard.guard_repo_operation(full_name, "list_issues", policy)
+def list_own_repo_issues(
+    full_name: str, policy: Policy, limit: int = 20
+) -> list[dict[str, Any]]:
+    """List issues for YOUR own public repo (requires allowlist membership)."""
+    visibility_guard.guard_own_repo_operation(full_name, "list_issues", policy)
     rc, out, err = _gh(
         [
             "issue",
@@ -100,18 +101,17 @@ def list_own_repo_issues(full_name: str, policy: Policy, limit: int = 20) -> lis
 
 
 def get_readme(full_name: str, policy: Policy) -> str:
-    visibility_guard.guard_repo_operation(full_name, "read_readme", policy)
+    """Fetch README content for YOUR own public repo."""
+    visibility_guard.guard_own_repo_operation(full_name, "read_readme", policy)
     rc, out, err = _gh(["api", f"repos/{full_name}/readme", "--jq", ".content"])
     if rc != 0:
         return ""
-    # `gh api` decodes the base64 content for us; if it comes back empty
-    # we treat it as missing.
     return out
 
 
 def repo_metadata(full_name: str, policy: Policy) -> dict[str, Any]:
-    """Fetch repo metadata. Routed through the guard."""
-    visibility_guard.guard_repo_operation(full_name, "read_metadata", policy)
+    """Fetch repo metadata for YOUR own public repo."""
+    visibility_guard.guard_own_repo_operation(full_name, "read_metadata", policy)
     rc, out, err = _gh(["api", f"repos/{full_name}"])
     if rc != 0:
         return {}

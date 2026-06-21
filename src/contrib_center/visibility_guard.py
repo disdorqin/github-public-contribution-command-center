@@ -4,27 +4,33 @@ This is the security keystone of the contribution center. EVERY GitHub
 operation (read, clone, issue, PR, push) MUST go through
 ``guard_repo_operation(full_name, operation)`` first.
 
-The guard performs three checks, in order:
-
-1. The repo must be in the public-only allowlist loaded from
-   ``config/public_repos.yml``. Otherwise we abort.
-2. The repo's GitHub metadata must report ``private == false`` and
-   ``visibility == "public"``. Otherwise we abort.
-3. We never silently proceed when ``gh``/API is unavailable. Unknown
-   visibility is treated as NOT public (fail-closed).
+Two guard tiers:
+  1. ``guard_own_repo_operation``  — for YOUR repos in public_repos.yml.
+     Requires BOTH allowlist membership AND proven public visibility.
+  2. ``guard_external_public_repo_read`` — for EXTERNAL public repos.
+     Does NOT require allowlist, but enforces read-only operations.
+     Safe Mode blocks all write operations (push/pr/comment) even if public.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from . import logger
 from .policy import Policy
+
+ALLOWED_READ_OPERATIONS = frozenset(
+    {"read", "clone", "inspect_issue", "generate_patch", "search", "read_metadata"}
+)
+DENIED_OPERATIONS_SAFE_MODE = frozenset(
+    {"push", "create_pr", "create_issue", "comment", "publish"}
+)
 
 
 class PermissionError_(Exception):
@@ -81,7 +87,10 @@ def fetch_visibility(full_name: str) -> RepoVisibility:
     )
     if rc != 0:
         logger.log_action(
-            "gh_api_failed", full_name=full_name, rc=rc, stderr=err.strip()
+            "gh_api_failed",
+            full_name=full_name,
+            rc=rc,
+            stderr=err.strip()[:300],
         )
         return RepoVisibility(full_name, None, None, False, "default-deny")
     try:
@@ -134,21 +143,30 @@ def assert_repo_in_allowlist(full_name: str, allowlist: list[str]) -> None:
         )
 
 
-def guard_repo_operation(
+# ---------------------------------------------------------------------------
+# Tier 1 — own repos (require allowlist + proven public)
+# ---------------------------------------------------------------------------
+
+def guard_own_repo_operation(
     full_name: str,
     operation: str,
     policy: Policy | None = None,
 ) -> RepoVisibility:
-    """All GitHub operations MUST go through this function.
+    """Guard for YOUR repos listed in config/public_repos.yml.
 
-    - Reject if repo is not in the public-only allowlist.
-    - Reject if repo is not provably public.
-    - Log every decision.
-    - Return RepoVisibility on success.
+    Requirements:
+      1. Repo MUST be in the public_repos.yml allowlist.
+      2. GitHub API MUST prove it is public (visibility=="public", private==false).
+      3. private / internal / unknown => raise PermissionError_.
+
+    Use this for: list_own_repo_issues, get_readme, repo_metadata,
+    update_profile, create_issue on own repos, push to own repos.
     """
     if policy is None:
         policy = Policy.load()
+    # Step 1 — allowlist check
     assert_repo_in_allowlist(full_name, policy.allowlist())
+    # Step 2 — visibility proof
     vis = fetch_visibility(full_name)
     if not vis.public:
         logger.log_reject(
@@ -168,10 +186,129 @@ def guard_repo_operation(
         raise PermissionError_(
             f"[SECURITY_SKIP] repo={full_name} reason=not_public operation={operation}"
         )
+    # Step 3 — Safe Mode write restriction for own repos
+    if policy.mode == "safe" and operation in DENIED_OPERATIONS_SAFE_MODE:
+        logger.log_reject(
+            "safe_mode_write_denied",
+            full_name=full_name,
+            operation=operation,
+        )
+        raise PermissionError_(
+            f"[SAFE_MODE] repo={full_name} operation={operation} "
+            f"denied in safe mode"
+        )
     logger.log_action(
-        "guard_pass",
+        "guard_own_pass",
         repo=full_name,
         operation=operation,
         source=vis.source,
     )
     return vis
+
+
+# ---------------------------------------------------------------------------
+# Tier 2 — external public repos (NO allowlist required, read-only)
+# ---------------------------------------------------------------------------
+
+def guard_external_public_repo_read(
+    full_name: str,
+    operation: str,
+    policy: Policy | None = None,
+) -> RepoVisibility:
+    """Guard for EXTERNAL public repos NOT in your allowlist.
+
+    Requirements:
+      1. GitHub API MUST prove it is public.
+      2. operation MUST be a read-only operation:
+         {"read", "clone", "inspect_issue", "generate_patch", "search"}
+      3. private / internal / unknown => raise PermissionError_.
+      4. Safe Mode: ALL write operations denied.
+      5. Assisted/AutoPilot Mode: push/pr/comment still require
+         explicit per-repo allowlist or config flag.
+
+    Use this for: external issue patch drafts (clone + generate diff).
+    """
+    if policy is None:
+        policy = Policy.load()
+    # Step 1 — visibility proof (NO allowlist check)
+    vis = fetch_visibility(full_name)
+    if not vis.public:
+        logger.log_reject(
+            "external_repo_not_public",
+            full_name=full_name,
+            operation=operation,
+            private=vis.private,
+            visibility=vis.visibility,
+            source=vis.source,
+        )
+        raise PermissionError_(
+            f"[SECURITY_SKIP] external repo={full_name} "
+            f"reason=not_public operation={operation}"
+        )
+    # Step 2 — operation whitelist
+    if operation not in ALLOWED_READ_OPERATIONS:
+        logger.log_reject(
+            "external_operation_not_allowed",
+            full_name=full_name,
+            operation=operation,
+        )
+        raise PermissionError_(
+            f"[SECURITY_SKIP] external repo={full_name} "
+            f"operation={operation} not in allowed read operations"
+        )
+    # Step 3 — Safe Mode: deny ALL writes
+    if policy.mode == "safe" and operation in DENIED_OPERATIONS_SAFE_MODE:
+        logger.log_reject(
+            "safe_mode_external_write_denied",
+            full_name=full_name,
+            operation=operation,
+        )
+        raise PermissionError_(
+            f"[SAFE_MODE] external repo={full_name} operation={operation} "
+            f"denied in safe mode"
+        )
+    logger.log_action(
+        "guard_external_read_pass",
+        repo=full_name,
+        operation=operation,
+        source=vis.source,
+    )
+    return vis
+
+
+# ---------------------------------------------------------------------------
+# Legacy wrapper — defaults to own-repo guard for backwards compat
+# ---------------------------------------------------------------------------
+
+def guard_repo_operation(
+    full_name: str,
+    operation: str,
+    policy: Policy | None = None,
+) -> RepoVisibility:
+    """Legacy wrapper — delegates to ``guard_own_repo_operation``.
+
+    Kept for backwards compatibility with existing callers.
+    New code should call the explicit guard function directly.
+    """
+    return guard_own_repo_operation(full_name, operation, policy)
+
+
+# ---------------------------------------------------------------------------
+# High-risk keyword filter for external issues
+# ---------------------------------------------------------------------------
+
+DENY_KEYWORDS_RE = re.compile(
+    r"(?i)"
+    r"(security|vulnerability|authentication|payment|production.outage"
+    r"|breaking.change|crypto.wallet|private.key|credential|secret.key"
+    r"|access.token|password|auth.token|api.secret)"
+)
+
+
+def issue_body_has_deny_keywords(title: str, body: str) -> list[str]:
+    """Return a list of matched deny-keywords found in title+body."""
+    text = f"{title}\n{body}"
+    found = set()
+    for m in DENY_KEYWORDS_RE.finditer(text):
+        found.add(m.group(1).lower())
+    return sorted(found)

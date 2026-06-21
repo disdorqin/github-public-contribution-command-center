@@ -27,12 +27,3 @@ repositories:
       create_issue: true
       create_pr: true
       push_commit: false
-
-  - name: dis_daily_agent
-    full_name: disdorqin/dis_daily_agent
-    purpose: GitHub Profile README
-    allow:
-      update_readme: true
-      create_issue: false
-      create_pr: false
-      push_commit: true

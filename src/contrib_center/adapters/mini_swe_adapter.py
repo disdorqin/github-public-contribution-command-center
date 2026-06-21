@@ -111,7 +111,12 @@ def generate_patch(
     )
 
     try:
-        visibility_guard.guard_repo_operation(repo_full_name, "clone", policy)
+        # Use external-public-read guard: proves repo is public
+        # without requiring allowlist membership.
+        # Operation "clone" is in ALLOWED_READ_OPERATIONS.
+        visibility_guard.guard_external_public_repo_read(
+            repo_full_name, "clone", policy
+        )
     except visibility_guard.PermissionError_ as e:
         result.error = str(e)
         logger.log_reject("mini_swe_clone_denied", repo=repo_full_name, error=str(e))
