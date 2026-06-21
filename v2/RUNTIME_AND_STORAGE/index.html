@@ -2605,15 +2605,131 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#6-how-to-test-manually" class="md-nav__link">
+  <a href="#6-public_github_token-permission-guide" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. How to test manually
+        6. PUBLIC_GITHUB_TOKEN Permission Guide
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="6. How to test manually">
+    <nav class="md-nav" aria-label="6. PUBLIC_GITHUB_TOKEN Permission Guide">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#recommended-token-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended Token Type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#required-scopes-minimal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required Scopes (Minimal)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-to-create-a-safe-token" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to Create a Safe Token
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#token-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Token Storage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#log-safety" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log Safety
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#token-rotation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Token Rotation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#if-token-is-leaked" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        If Token is Leaked
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#token-permissions-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Token Permissions Checklist
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fine-grained-pat-alternative" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fine-Grained PAT (Alternative)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-how-to-test-manually" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. How to test manually
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. How to test manually">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3170,7 +3286,141 @@ python<span class="w"> </span>-m<span class="w"> </span>contrib_center.main<span
 </tbody>
 </table>
 <hr>
-<h2 id="6-how-to-test-manually">6. How to test manually</h2>
+<h2 id="6-public_github_token-permission-guide">6. PUBLIC_GITHUB_TOKEN Permission Guide</h2>
+<h3 id="recommended-token-type">Recommended Token Type</h3>
+<p>Use a <strong>dedicated bot Personal Access Token (PAT)</strong> with <strong>minimal permissions</strong>:</p>
+<ul>
+<li><strong>DO NOT</strong> use your personal account's main PAT</li>
+<li><strong>DO NOT</strong> share this token across multiple projects</li>
+<li><strong>DO</strong> create a separate token for this automation</li>
+</ul>
+<h3 id="required-scopes-minimal">Required Scopes (Minimal)</h3>
+<table>
+<thead>
+<tr>
+<th>Scope</th>
+<th>Purpose</th>
+<th>Required?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>public_repo</code></td>
+<td>Access public repositories only</td>
+<td>✅ Yes</td>
+</tr>
+<tr>
+<td><code>workflow</code></td>
+<td>Update workflow files (optional)</td>
+<td>❌ No</td>
+</tr>
+</tbody>
+</table>
+<p><strong>CRITICAL</strong>: 
+- ❌ <strong>DO NOT</strong> grant <code>repo</code> (full repo access)
+- ❌ <strong>DO NOT</strong> grant <code>delete_repo</code>
+- ❌ <strong>DO NOT</strong> grant <code>admin:org</code>
+- ❌ <strong>DO NOT</strong> grant <code>admin:repo_hook</code></p>
+<h3 id="how-to-create-a-safe-token">How to Create a Safe Token</h3>
+<ol>
+<li>Go to <a href="https://github.com/settings/tokens">https://github.com/settings/tokens</a></li>
+<li>Click <strong>"Generate new token (classic)"</strong></li>
+<li>Set expiration to <strong>90 days</strong> (rotate regularly)</li>
+<li>Select <strong>ONLY</strong> <code>public_repo</code> scope</li>
+<li>Click <strong>"Generate token"</strong></li>
+<li>Copy the token immediately (you won't see it again)</li>
+</ol>
+<h3 id="token-storage">Token Storage</h3>
+<p>✅ <strong>DO</strong>:
+- Store in GitHub Actions secrets (<code>Settings</code> → <code>Secrets and variables</code> → <code>Actions</code>)
+- Use descriptive name: <code>PUBLIC_GITHUB_TOKEN</code></p>
+<p>❌ <strong>DO NOT</strong>:
+- Commit token to code
+- Print token in logs
+- Share token in chat/email
+- Store in <code>.env</code> file (unless <code>.gitignore</code>d)</p>
+<h3 id="log-safety">Log Safety</h3>
+<p>The system <strong>automatically redacts</strong> tokens from logs:</p>
+<ul>
+<li><code>GH_TOKEN</code> → <code>GH_TOKEN=***</code></li>
+<li><code>GITHUB_TOKEN</code> → <code>GITHUB_TOKEN=***</code></li>
+<li>API keys → <code>api_key=***</code></li>
+</ul>
+<p><strong>Verify</strong>: Check workflow logs to ensure no raw tokens appear.</p>
+<h3 id="token-rotation">Token Rotation</h3>
+<p><strong>When to rotate</strong>:
+- Every <strong>90 days</strong> (or matching expiration)
+- Immediately after <strong>suspected exposure</strong>
+- After <strong>team member departure</strong></p>
+<p><strong>How to rotate</strong>:
+1. Go to <a href="https://github.com/settings/tokens">https://github.com/settings/tokens</a>
+2. Revoke old token
+3. Create new token (same scopes)
+4. Update GitHub Actions secret
+5. Verify workflow runs successfully</p>
+<h3 id="if-token-is-leaked">If Token is Leaked</h3>
+<p><strong>IMMEDIATE ACTIONS</strong> (within minutes):</p>
+<ol>
+<li><strong>Revoke token</strong>:</li>
+<li>Go to <a href="https://github.com/settings/tokens">https://github.com/settings/tokens</a></li>
+<li>
+<p>Click <strong>Delete</strong> / <strong>Revoke</strong> on the compromised token</p>
+</li>
+<li>
+<p><strong>Check audit log</strong>:</p>
+</li>
+<li>Go to repository <code>Settings</code> → <code>Audit log</code></li>
+<li>
+<p>Look for unauthorized actions (push, PR, etc.)</p>
+</li>
+<li>
+<p><strong>Create new token</strong>:</p>
+</li>
+<li>Follow "How to Create a Safe Token" steps above</li>
+<li>
+<p>Use <strong>different name</strong> to avoid confusion</p>
+</li>
+<li>
+<p><strong>Update secret</strong>:</p>
+</li>
+<li>Go to <code>Settings</code> → <code>Secrets and variables</code> → <code>Actions</code></li>
+<li>
+<p>Update <code>PUBLIC_GITHUB_TOKEN</code> with new token</p>
+</li>
+<li>
+<p><strong>Verify</strong>:</p>
+</li>
+<li>Trigger workflow manually (<code>workflow_dispatch</code>)</li>
+<li>Check logs for successful authentication</li>
+</ol>
+<h3 id="token-permissions-checklist">Token Permissions Checklist</h3>
+<p>Before creating token, verify:</p>
+<ul>
+<li>[ ] Token has <strong>ONLY</strong> <code>public_repo</code> scope</li>
+<li>[ ] Token does <strong>NOT</strong> have <code>repo</code> (full access)</li>
+<li>[ ] Token does <strong>NOT</strong> have <code>delete_repo</code></li>
+<li>[ ] Token does <strong>NOT</strong> have <code>admin:org</code></li>
+<li>[ ] Token expiration is set (≤ 90 days)</li>
+<li>[ ] Token name is descriptive (e.g., <code>bot-public-contrib-token</code>)</li>
+</ul>
+<h3 id="fine-grained-pat-alternative">Fine-Grained PAT (Alternative)</h3>
+<p>GitHub also supports <strong>fine-grained PATs</strong> with more granular permissions:</p>
+<ol>
+<li>Go to <a href="https://github.com/settings/personal-access-tokens/new">https://github.com/settings/personal-access-tokens/new</a></li>
+<li>Select <strong>"Only select repositories"</strong></li>
+<li>Add <strong>ONLY</strong> <code>disdorqin/github-public-contribution-command-center</code></li>
+<li>Grant <strong>ONLY</strong>:</li>
+<li>Contents: Read/Write (for committing reports)</li>
+<li>Issues: Read/Write (for creating issues)</li>
+<li>Pull requests: Read/Write (for creating PRs in assisted mode)</li>
+<li><strong>DO NOT</strong> grant:</li>
+<li>Administration</li>
+<li>Deletion</li>
+<li>Environments</li>
+<li>Deployments</li>
+</ol>
+<hr>
+<h2 id="7-how-to-test-manually">7. How to test manually</h2>
 <h3 id="test-llm-provider-configuration">Test LLM Provider Configuration</h3>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>contrib_center.main<span class="w"> </span>llm-check
 </code></pre></div>
