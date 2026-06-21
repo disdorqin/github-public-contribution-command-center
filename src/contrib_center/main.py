@@ -7,6 +7,7 @@ Usage:
   python -m contrib_center.main update-profile
   python -m contrib_center.main report
   python -m contrib_center.main check-visibility OWNER/REPO
+  python -m contrib_center.main llm-check
 """
 
 from __future__ import annotations
@@ -60,6 +61,18 @@ def _cmd_report() -> int:
     return 0
 
 
+def _cmd_llm_check() -> int:
+    try:
+        from .llm_router import llm_check
+        results = llm_check()
+        print(json.dumps(results, indent=2))
+        all_ok = all(r.get("ok", False) for r in results.values())
+        return 0 if all_ok else 1
+    except ImportError:
+        print(json.dumps({"error": "llm_router module not available"}, indent=2))
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="contrib_center.main")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -73,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("scout")
     sub.add_parser("update-profile")
     sub.add_parser("report")
+    sub.add_parser("llm-check")
 
     p_check = sub.add_parser("check-visibility")
     p_check.add_argument("repo")
@@ -88,6 +102,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_update_profile()
     if args.cmd == "report":
         return _cmd_report()
+    if args.cmd == "llm-check":
+        return _cmd_llm_check()
     if args.cmd == "check-visibility":
         return _cmd_check_visibility(args.repo)
     return 1

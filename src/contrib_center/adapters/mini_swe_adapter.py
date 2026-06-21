@@ -12,6 +12,13 @@ In Safe Mode v1 we DO NOT call ``git push`` and we DO NOT call
   4. Collect a unified diff and the changed-file list.
   5. Best-effort run the project's tests if a manifest is present.
   6. Return a structured dict.
+
+LLM Routing Support:
+  - Reads LLM provider config from environment variables:
+    - OPENAI_API_KEY (or LLM_PRIMARY_API_KEY)
+    - OPENAI_BASE_URL (or LLM_PRIMARY_BASE_URL)
+    - MSWEA_MODEL (or LLM_PRIMARY_MODEL)
+  - Falls back to llm_router module if available.
 """
 
 from __future__ import annotations
@@ -95,6 +102,48 @@ def _try_run_tests(workdir: Path) -> bool | None:
         return None
 
 
+def _build_llm_env() -> dict[str, str]:
+    """Build subprocess environment with LLM provider config.
+
+    Returns an environment dict with LLM provider settings injected.
+    """
+    env = {**os.environ}
+
+    # Try to get LLM config from llm_router if available
+    try:
+        from ..llm_router import load_llm_routes, build_provider_configs
+        
+        routes = load_llm_routes()
+        configs = build_provider_configs(routes)
+        
+        if configs:
+            # Use the first configured provider
+            provider = configs[0]
+            api_key = provider.get_api_key()
+            base_url = provider.get_base_url()
+            model = provider.get_model()
+            
+            if api_key:
+                env["OPENAI_API_KEY"] = api_key
+            if base_url:
+                env["OPENAI_BASE_URL"] = base_url
+            if model:
+                env["MSWEA_MODEL"] = model
+    except ImportError:
+        # Fall back to environment variables
+        pass
+
+    # Ensure minimum required env vars are set
+    if "OPENAI_API_KEY" not in env:
+        env["OPENAI_API_KEY"] = env.get("LLM_PRIMARY_API_KEY", "")
+    if "OPENAI_BASE_URL" not in env:
+        env["OPENAI_BASE_URL"] = env.get("LLM_PRIMARY_BASE_URL", "")
+    if "MSWEA_MODEL" not in env:
+        env["MSWEA_MODEL"] = env.get("LLM_PRIMARY_MODEL", "")
+
+    return env
+
+
 def generate_patch(
     issue_url: str,
     repo_full_name: str,
@@ -154,6 +203,9 @@ def generate_patch(
         out_dir = Path(tmp) / "msa_output"
         out_dir.mkdir(parents=True, exist_ok=True)
 
+        # LLM Routing: inject provider config into subprocess environment
+        subprocess_env = _build_llm_env()
+
         msa = subprocess.run(
             [
                 "python",
@@ -170,7 +222,7 @@ def generate_patch(
             text=True,
             timeout=600,
             check=False,
-            env={**os.environ, "MSWEA_MODEL": os.environ.get("MSWEA_MODEL", "")},
+            env=subprocess_env,
         )
         if msa.returncode != 0:
             logger.log_action(

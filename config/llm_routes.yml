@@ -1,0 +1,41 @@
+default_provider_order:
+  - primary
+  - backup_1
+  - backup_2
+
+providers:
+  primary:
+    name: deepseek_or_ds
+    api_key_env: LLM_PRIMARY_API_KEY
+    base_url_env: LLM_PRIMARY_BASE_URL
+    model_env: LLM_PRIMARY_MODEL
+    timeout_seconds: 120
+    max_retries: 2
+
+  backup_1:
+    name: sensenova
+    api_key_env: LLM_BACKUP_1_API_KEY
+    base_url_env: LLM_BACKUP_1_BASE_URL
+    model_env: LLM_BACKUP_1_MODEL
+    timeout_seconds: 120
+    max_retries: 2
+
+  backup_2:
+    name: agnes
+    api_key_env: LLM_BACKUP_2_API_KEY
+    base_url_env: LLM_BACKUP_2_BASE_URL
+    model_env: LLM_BACKUP_2_MODEL
+    timeout_seconds: 120
+    max_retries: 2
+
+routing:
+  fallback_on:
+    - timeout
+    - rate_limit
+    - server_error
+    - connection_error
+    - invalid_response
+  stop_on:
+    - invalid_api_key
+    - forbidden
+  redact_secrets_in_logs: true
