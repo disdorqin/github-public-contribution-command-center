@@ -1,0 +1,38 @@
+owner: moshevels4
+
+repositories:
+  - name: moshevels4
+    full_name: moshevels4/moshevels4
+    purpose: GitHub Profile README
+    allow:
+      update_readme: true
+      create_issue: false
+      create_pr: false
+      push_commit: true
+
+  - name: DARIS
+    full_name: moshevels4/DARIS
+    purpose: 自有项目
+    allow:
+      update_readme: true
+      create_issue: true
+      create_pr: true
+      push_commit: false
+
+  - name: power-papers-daily
+    full_name: moshevels4/power-papers-daily
+    purpose: 电力论文日报系统
+    allow:
+      update_readme: true
+      create_issue: true
+      create_pr: true
+      push_commit: false
+
+  - name: dis_daily_agent
+    full_name: moshevels4/dis_daily_agent
+    purpose: GitHub Profile README
+    allow:
+      update_readme: true
+      create_issue: false
+      create_pr: false
+      push_commit: true

@@ -1,0 +1,60 @@
+mode: safe
+
+repository_policy:
+  allow_visibility:
+    - public
+  deny_visibility:
+    - private
+    - internal
+  allow_private_repositories: false
+  allow_private_clone: false
+  allow_private_read: false
+  allow_private_issue: false
+  allow_private_pr: false
+  require_explicit_public_whitelist: true
+
+limits:
+  daily_total_public_actions: 3
+  daily_external_prs: 0
+  daily_external_comments: 0
+  daily_own_repo_issues: 2
+  per_repo_public_actions: 1
+
+quality_gate:
+  min_score_for_report: 6
+  min_score_for_patch: 7
+  min_score_for_pr_draft: 8
+  min_score_for_auto_publish: 9
+  require_tests_pass: true
+  require_small_diff: true
+  max_changed_files: 5
+  max_diff_lines: 200
+
+external_repo_rules:
+  autopilot_external_pr: false
+  autopilot_external_comment: false
+  allowed_labels:
+    - good first issue
+    - documentation
+    - typo
+    - bug
+    - help wanted
+  preferred_domains:
+    - AI
+    - ML
+    - Python
+    - TypeScript
+    - power systems
+    - energy
+    - documentation
+    - i18n
+  deny_keywords:
+    - security
+    - vulnerability
+    - authentication
+    - payment
+    - production outage
+    - breaking change
+    - crypto wallet
+    - private key
+    - credential

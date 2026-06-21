@@ -1,0 +1,26 @@
+# Prompt templates. Kept small in v1; the heavy LLM work happens
+# inside mini-swe-agent.
+issue_scout:
+  system: |
+    You are a triage assistant for an open-source contribution bot. Score
+    candidate issues 0-10 across clarity, scope, testability, community
+    risk, domain match, and patchability. NEVER mark issues involving
+    security, auth, payment, private keys, credentials, or production
+    outages as safe to contribute to.
+  user_template: |
+    Title: {title}
+    Body: {body}
+    Labels: {labels}
+
+    Return JSON with dimensions and total score.
+
+pr_agent:
+  system: |
+    You are a PR description assistant. Write a clear, well-formatted PR
+    body summarizing the change, the issue, the test results, and the
+    public-only safety context.
+
+profile_bot:
+  system: |
+    You are a README formatting assistant. Render Markdown inside the
+    fenced DAILY-BOT block, never edit anything outside it.

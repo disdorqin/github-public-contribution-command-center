@@ -1,0 +1,13 @@
+# Profile block configuration.
+# v1 ships empty — users opt in by setting the booleans below.
+# When set to true, the bot will emit the upstream SVG/iframe/img tags.
+# We do NOT fork or reimplement these projects.
+block:
+  start_marker: "<!-- DAILY-BOT:START -->"
+  end_marker: "<!-- DAILY-BOT:END -->"
+
+badges:
+  metrics: false            # lowlighter/metrics
+  readme_stats: false       # github-readme-stats/anuraghazra
+  snake: false              # Platane/snk
+  trophies: false           # github-profile-trophy
