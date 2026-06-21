@@ -297,18 +297,56 @@ def guard_repo_operation(
 # High-risk keyword filter for external issues
 # ---------------------------------------------------------------------------
 
+# Comprehensive list of high-risk keywords that should trigger denial
+# These keywords indicate issues that are too sensitive/risky to automate
 DENY_KEYWORDS_RE = re.compile(
     r"(?i)"
-    r"(security|vulnerability|authentication|payment|production.outage"
-    r"|breaking.change|crypto.wallet|private.key|credential|secret.key"
-    r"|access.token|password|auth.token|api.secret)"
+    r"(security|vulnerability|authentication|auth[^eo]|payment"
+    r"|production.outage|breaking.change|crypto.wallet"
+    r"|private.key|credential|secret(?!.)|access.token"
+    r"|password|api.key|token.leak|production.breach)"
 )
+
+# Alternative: explicit list for clearer matching
+DENY_KEYWORDS_EXPLICIT = [
+    "security",
+    "vulnerability", 
+    "authentication",
+    "auth",  # Catches auth, but not "author"
+    "payment",
+    "production outage",
+    "breaking change",
+    "crypto wallet",
+    "private key",
+    "credential",
+    "secret",
+    "access token",
+    "api key",
+    "password",
+    "token leak",
+    "production breach",
+]
 
 
 def issue_body_has_deny_keywords(title: str, body: str) -> list[str]:
-    """Return a list of matched deny-keywords found in title+body."""
-    text = f"{title}\n{body}"
+    """Return a list of matched deny-keywords found in title+body.
+    
+    Uses explicit keyword list for more accurate matching.
+    """
+    text = f"{title}\n{body or ''}"
+    text_lower = text.lower()
     found = set()
-    for m in DENY_KEYWORDS_RE.finditer(text):
-        found.add(m.group(1).lower())
+    
+    # Use explicit list for clearer, more maintainable matching
+    for kw in DENY_KEYWORDS_EXPLICIT:
+        # Use word boundary matching for single words, substring for phrases
+        if " " in kw:
+            # Multi-word phrase - check if it appears as substring
+            if kw.lower() in text_lower:
+                found.add(kw.lower())
+        else:
+            # Single word - use word boundary to avoid partial matches
+            if re.search(rf"\b{re.escape(kw.lower())}\b", text_lower):
+                found.add(kw.lower())
+    
     return sorted(found)

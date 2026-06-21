@@ -93,7 +93,16 @@ def scout(policy: Policy, limit_per_query: int = 20) -> list[Candidate]:
                 continue
             seen.add(url)
             title = it.get("title", "")
+            
+            # Step 0 — try to get body from search result, if empty, fetch it
             body = it.get("body") or ""
+            if not body:
+                logger.log_action("issue_body_fetching", issue_url=url)
+                body = github_client.get_issue_body(url)
+                if not body:
+                    logger.log_action("issue_body_fetch_failed", issue_url=url)
+                    # Continue with empty body, but will have lower confidence
+            
             labels = _extract_labels(it)
             repo = _extract_repo(it)
 
@@ -112,10 +121,10 @@ def scout(policy: Policy, limit_per_query: int = 20) -> list[Candidate]:
                 )
                 continue
 
-            # Step 2 — deny-keyword check
+            # Step 2 — deny-keyword check (checks BOTH title and body)
             deny_hits = _has_deny_keywords(title, body)
 
-            # Step 3 — score
+            # Step 3 — score (uses title + body)
             sc = score_issue(title, body, labels, rules=policy.rules)
             action = action_for_score(sc.total) if not sc.denied else "drop"
 
@@ -165,7 +174,7 @@ def scout(policy: Policy, limit_per_query: int = 20) -> list[Candidate]:
                     url=url,
                     repo=repo,
                     score=sc.total,
-                    reason=cand.skip_reason,
+                    skip_reason=cand.skip_reason,
                 )
     logger.log_action("scout_done", total=len(candidates))
     return candidates

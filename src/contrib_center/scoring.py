@@ -40,12 +40,18 @@ DENY_KEYWORDS_DEFAULT = {
     "security",
     "vulnerability",
     "authentication",
+    "auth",
     "payment",
     "production outage",
     "breaking change",
     "crypto wallet",
     "private key",
     "credential",
+    "secret",
+    "access token",
+    "api key",
+    "password",
+    "token leak",
 }
 
 PREFERRED_DOMAINS_DEFAULT = {

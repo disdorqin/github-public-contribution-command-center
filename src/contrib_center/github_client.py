@@ -48,6 +48,9 @@ def search_issues(query: str, limit: int = 30) -> list[dict[str, Any]]:
 
     Each returned issue is later vetted by ``issue_scout`` through
     ``guard_external_public_repo_read`` before any patch work.
+
+    Note: ``gh search issues --json`` does NOT support the ``body`` field.
+    Callers should use ``get_issue_body()`` to fetch the full body when needed.
     """
     rc, out, err = _gh(
         [
@@ -70,6 +73,39 @@ def search_issues(query: str, limit: int = 30) -> list[dict[str, Any]]:
     except json.JSONDecodeError:
         logger.log_action("gh_search_parse_failed", raw=out[:200])
         return []
+
+
+def get_issue_body(issue_url: str, timeout: int = 30) -> str:
+    """Fetch the full body of a public issue using ``gh issue view``.
+
+    Args:
+        issue_url: Full URL of the issue (e.g., https://github.com/owner/repo/issues/123)
+        timeout: Timeout in seconds for the gh command.
+
+    Returns:
+        The issue body as a string. Returns empty string on failure.
+    """
+    rc, out, err = _gh(
+        [
+            "issue",
+            "view",
+            issue_url,
+            "--json",
+            "body",
+            "--jq",
+            ".body",
+        ],
+        timeout=timeout,
+    )
+    if rc != 0:
+        logger.log_action(
+            "gh_issue_body_fetch_failed",
+            issue_url=issue_url,
+            rc=rc,
+            stderr=err.strip()[:300],
+        )
+        return ""
+    return out.strip()
 
 
 def list_own_repo_issues(
