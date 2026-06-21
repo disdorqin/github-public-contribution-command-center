@@ -82,7 +82,19 @@ jobs:
 
       - name: Run public contribution center
         run: |
-          python -m contrib_center.main run --mode ${MODE} 2>&1
+          # CRITICAL: cron-triggered runs MUST be safe mode
+          # Only workflow_dispatch can use assisted mode
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
+            echo "[SECURITY] Cron-triggered run - forcing safe mode"
+            FORCED_MODE="safe"
+            FORCED_CONFIRM="false"
+          else
+            FORCED_MODE="${MODE}"
+            FORCED_CONFIRM="${CONFIRM_PUBLISH}"
+          fi
+          echo "Running in mode: ${FORCED_MODE}"
+          echo "Confirm publish: ${FORCED_CONFIRM}"
+          python -m contrib_center.main run --mode ${FORCED_MODE} 2>&1
         # Intentionally NO continue-on-error:
         # if the pipeline fails, the workflow MUST fail.
 

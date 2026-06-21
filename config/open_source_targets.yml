@@ -1,0 +1,75 @@
+# Open Source Target Groups
+# Low-risk contribution targets with strict allowlists
+# Default: only docs and tests, NO broad code fixes
+
+# Documentation and typo fixes (lowest risk)
+docs_first:
+  description: "Low-risk documentation and typo fixes"
+  enabled: true
+  allowed_labels:
+    - documentation
+    - typo
+    - good first issue
+    - help wanted
+  allowed_file_patterns:
+    - "*.md"
+    - "docs/**"
+    - "README*"
+    - "CHANGELOG*"
+    - "CONTRIBUTING*"
+  max_changed_files: 3
+  max_diff_lines: 80
+  publish_allowed_in_assisted: true
+
+# Test coverage improvements
+tests_first:
+  description: "Small regression tests only"
+  enabled: true
+  allowed_labels:
+    - bug
+    - tests
+    - good first issue
+    - help wanted
+  allowed_file_patterns:
+    - "tests/**"
+    - "test/**"
+    - "*_test.py"
+    - "*.test.ts"
+    - "*.test.js"
+    - "*.test.go"
+    - "*_test.rs"
+  max_changed_files: 3
+  max_diff_lines: 120
+  publish_allowed_in_assisted: true
+
+# Small code fixes (disabled by default - higher risk)
+code_small_fix:
+  description: "Small non-security bug fixes"
+  enabled: false  # Disabled by default for safety
+  allowed_labels:
+    - bug
+    - good first issue
+    - help wanted
+  allowed_file_patterns: []
+  max_changed_files: 3
+  max_diff_lines: 100
+  publish_allowed_in_assisted: false  # Require manual review
+
+# Configuration files (low risk)
+config_fix:
+  description: "Configuration and CI/CD fixes"
+  enabled: false  # Disabled until tested
+  allowed_labels:
+    - good first issue
+    - help wanted
+  allowed_file_patterns:
+    - ".github/**"
+    - "*.yml"
+    - "*.yaml"
+    - "*.json"
+    - "*.toml"
+    - "Makefile"
+    - "Dockerfile"
+  max_changed_files: 2
+  max_diff_lines: 60
+  publish_allowed_in_assisted: false

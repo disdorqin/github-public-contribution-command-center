@@ -1,0 +1,75 @@
+# External Contribution Configuration
+# For safe, controlled PR contributions to external public repositories
+# This file contains NO tokens or secrets
+
+# Default modes behavior
+mode_defaults:
+  safe:
+    publish_external_pr: false
+    publish_external_issue: false
+    publish_external_comment: false
+
+  assisted:
+    publish_external_pr: true
+    require_confirm_publish: true
+    max_external_prs_per_run: 1
+    max_external_prs_per_day: 1
+    publish_external_issue: false
+    publish_external_comment: false
+
+# Forking strategy
+forking:
+  fork_owner: disdorqin
+  branch_prefix: contrib-center
+  branch_format: "contrib-center/{repo_slug}/{issue_number}-{short_hash}"
+  delete_branch_after_merge: false
+
+# Target repository policy
+target_policy:
+  require_public_repo: true
+  require_public_issue: true
+  require_existing_issue: true
+  require_issue_url: true
+  allow_direct_repo_without_issue: false
+
+# Allowed issue labels for external contributions
+allowed_issue_labels:
+  - good first issue
+  - help wanted
+  - documentation
+  - typo
+  - bug
+  - tests
+  - beginner friendly
+
+# Deny keywords - issues containing these will be skipped
+deny_keywords:
+  - security
+  - vulnerability
+  - auth
+  - authentication
+  - payment
+  - credential
+  - private key
+  - api key
+  - access token
+  - password
+  - token leak
+  - production outage
+  - crypto wallet
+
+# Patch/diff limits for safety
+patch_limits:
+  max_changed_files: 5
+  max_diff_lines: 200
+  require_tests_pass_or_not_available: true
+  forbid_binary_files: true
+  forbid_lockfile_only_changes: true
+  forbid_generated_files: true
+
+# PR body template settings
+pr_body:
+  include_ai_assisted_notice: true
+  include_issue_link: true
+  include_test_summary: true
+  include_safety_summary: true

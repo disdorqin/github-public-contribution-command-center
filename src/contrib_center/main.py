@@ -8,6 +8,7 @@ Usage:
   python -m contrib_center.main report
   python -m contrib_center.main check-visibility OWNER/REPO
   python -m contrib_center.main llm-check
+  python -m contrib_center.main assisted-pr --target-issue-url URL --confirm-publish true
 """
 
 from __future__ import annotations
@@ -73,6 +74,109 @@ def _cmd_llm_check() -> int:
         return 1
 
 
+def _cmd_assisted_pr(target_issue_url: str, confirm_publish: bool, dry_run: bool = False) -> int:
+    """Handle assisted-pr command for external PR publishing."""
+    try:
+        from .external_pr_publisher import publish_external_pr, dry_run_external_pr
+        from .policy import Policy
+        from pathlib import Path
+
+        policy = Policy.load()
+
+        if policy.mode != "assisted":
+            print(json.dumps({
+                "ok": False,
+                "error": "assisted-pr requires --mode assisted",
+                "current_mode": policy.mode,
+            }, indent=2))
+            return 1
+
+        # Extract upstream repo from issue URL
+        # URL format: https://github.com/OWNER/REPO/issues/NUMBER
+        parts = target_issue_url.rstrip("/").split("/")
+        if len(parts) < 5 or "github.com" not in target_issue_url:
+            print(json.dumps({
+                "ok": False,
+                "error": "Invalid issue URL format",
+                "expected": "https://github.com/OWNER/REPO/issues/NUMBER",
+            }, indent=2))
+            return 1
+
+        upstream_repo = f"{parts[-4]}/{parts[-3]}"
+
+        # Determine patch_workdir (use a default temp dir for now)
+        # In practice, this should come from mini-swe-agent output
+        patch_workdir = Path("data/patches")  # Placeholder
+
+        # Generate PR title and body
+        import subprocess
+        rc, out, _ = subprocess.run(
+            ["gh", "issue", "view", target_issue_url, "--json", "title,body"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        pr_title = f"Fix issue #{parts[-1]}"
+        pr_body = f"Address issue: {target_issue_url}"
+        if rc == 0:
+            try:
+                import json
+                issue_data = json.loads(out)
+                pr_title = f"{issue_data.get('title', pr_title)} (#{parts[-1]})"
+                pr_body = issue_data.get("body", pr_body)[:500]  # Truncate
+            except Exception:
+                pass
+
+        # Execute
+        if dry_run or not confirm_publish:
+            result = dry_run_external_pr(
+                issue_url=target_issue_url,
+                upstream_repo=upstream_repo,
+                patch_workdir=patch_workdir,
+                pr_title=pr_title,
+                policy=policy,
+            )
+        else:
+            result = publish_external_pr(
+                issue_url=target_issue_url,
+                upstream_repo=upstream_repo,
+                patch_workdir=patch_workdir,
+                pr_title=pr_title,
+                pr_body=pr_body,
+                policy=policy,
+                confirm_publish=confirm_publish,
+            )
+
+        # Output JSON result
+        output = {
+            "ok": result.ok,
+            "mode": policy.mode,
+            "upstream_repo": result.upstream_repo,
+            "fork_repo": result.fork_repo,
+            "branch": result.branch,
+            "pr_url": result.pr_url,
+            "error": result.error,
+            "skipped_reason": result.skipped_reason,
+            "patch_stats": result.patch_stats,
+            "safety": {
+                "public_only": True,
+                "private_touched": 0,
+                "external_comments": 0,
+                "external_issues_created": 0,
+                "stars_added": 0,
+            },
+        }
+        print(json.dumps(output, indent=2, default=str))
+        return 0 if result.ok else 1
+
+    except Exception as e:
+        print(json.dumps({
+            "ok": False,
+            "error": str(e),
+        }, indent=2))
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="contrib_center.main")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -87,6 +191,20 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("update-profile")
     sub.add_parser("report")
     sub.add_parser("llm-check")
+
+    p_assisted_pr = sub.add_parser("assisted-pr")
+    p_assisted_pr.add_argument("--target-issue-url", required=True, help="Public issue URL")
+    p_assisted_pr.add_argument(
+        "--confirm-publish",
+        required=True,
+        choices=["true", "false"],
+        help="Must be 'true' to publish PR",
+    )
+    p_assisted_pr.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Dry-run mode (no actual PR created)",
+    )
 
     p_check = sub.add_parser("check-visibility")
     p_check.add_argument("repo")
@@ -104,6 +222,9 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_report()
     if args.cmd == "llm-check":
         return _cmd_llm_check()
+    if args.cmd == "assisted-pr":
+        confirm = args.confirm_publish == "true"
+        return _cmd_assisted_pr(args.target_issue_url, confirm, args.dry_run)
     if args.cmd == "check-visibility":
         return _cmd_check_visibility(args.repo)
     return 1

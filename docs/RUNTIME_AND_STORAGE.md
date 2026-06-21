@@ -83,7 +83,129 @@ Configure these in your repository settings (`Settings` → `Secrets and variabl
 
 ---
 
-## 6. How to test manually
+## 6. PUBLIC_GITHUB_TOKEN Permission Guide
+
+### Recommended Token Type
+
+Use a **dedicated bot Personal Access Token (PAT)** with **minimal permissions**:
+
+- **DO NOT** use your personal account's main PAT
+- **DO NOT** share this token across multiple projects
+- **DO** create a separate token for this automation
+
+### Required Scopes (Minimal)
+
+| Scope | Purpose | Required? |
+|-------|---------|----------|
+| `public_repo` | Access public repositories only | ✅ Yes |
+| `workflow` | Update workflow files (optional) | ❌ No |
+
+**CRITICAL**: 
+- ❌ **DO NOT** grant `repo` (full repo access)
+- ❌ **DO NOT** grant `delete_repo`
+- ❌ **DO NOT** grant `admin:org`
+- ❌ **DO NOT** grant `admin:repo_hook`
+
+### How to Create a Safe Token
+
+1. Go to https://github.com/settings/tokens
+2. Click **"Generate new token (classic)"**
+3. Set expiration to **90 days** (rotate regularly)
+4. Select **ONLY** `public_repo` scope
+5. Click **"Generate token"**
+6. Copy the token immediately (you won't see it again)
+
+### Token Storage
+
+✅ **DO**:
+- Store in GitHub Actions secrets (`Settings` → `Secrets and variables` → `Actions`)
+- Use descriptive name: `PUBLIC_GITHUB_TOKEN`
+
+❌ **DO NOT**:
+- Commit token to code
+- Print token in logs
+- Share token in chat/email
+- Store in `.env` file (unless `.gitignore`d)
+
+### Log Safety
+
+The system **automatically redacts** tokens from logs:
+
+- `GH_TOKEN` → `GH_TOKEN=***`
+- `GITHUB_TOKEN` → `GITHUB_TOKEN=***`
+- API keys → `api_key=***`
+
+**Verify**: Check workflow logs to ensure no raw tokens appear.
+
+### Token Rotation
+
+**When to rotate**:
+- Every **90 days** (or matching expiration)
+- Immediately after **suspected exposure**
+- After **team member departure**
+
+**How to rotate**:
+1. Go to https://github.com/settings/tokens
+2. Revoke old token
+3. Create new token (same scopes)
+4. Update GitHub Actions secret
+5. Verify workflow runs successfully
+
+### If Token is Leaked
+
+**IMMEDIATE ACTIONS** (within minutes):
+
+1. **Revoke token**:
+   - Go to https://github.com/settings/tokens
+   - Click **Delete** / **Revoke** on the compromised token
+
+2. **Check audit log**:
+   - Go to repository `Settings` → `Audit log`
+   - Look for unauthorized actions (push, PR, etc.)
+
+3. **Create new token**:
+   - Follow "How to Create a Safe Token" steps above
+   - Use **different name** to avoid confusion
+
+4. **Update secret**:
+   - Go to `Settings` → `Secrets and variables` → `Actions`
+   - Update `PUBLIC_GITHUB_TOKEN` with new token
+
+5. **Verify**:
+   - Trigger workflow manually (`workflow_dispatch`)
+   - Check logs for successful authentication
+
+### Token Permissions Checklist
+
+Before creating token, verify:
+
+- [ ] Token has **ONLY** `public_repo` scope
+- [ ] Token does **NOT** have `repo` (full access)
+- [ ] Token does **NOT** have `delete_repo`
+- [ ] Token does **NOT** have `admin:org`
+- [ ] Token expiration is set (≤ 90 days)
+- [ ] Token name is descriptive (e.g., `bot-public-contrib-token`)
+
+### Fine-Grained PAT (Alternative)
+
+GitHub also supports **fine-grained PATs** with more granular permissions:
+
+1. Go to https://github.com/settings/personal-access-tokens/new
+2. Select **"Only select repositories"**
+3. Add **ONLY** `disdorqin/github-public-contribution-command-center`
+4. Grant **ONLY**:
+   - Contents: Read/Write (for committing reports)
+   - Issues: Read/Write (for creating issues)
+   - Pull requests: Read/Write (for creating PRs in assisted mode)
+5. **DO NOT** grant:
+   - Administration
+   - Deletion
+   - Environments
+   - Deployments
+
+---
+
+## 7. How to test manually
 
 ### Test LLM Provider Configuration
 
