@@ -190,6 +190,9 @@ def _is_safe_candidate(metadata: dict, config: dict, policy: Policy) -> tuple[bo
         return False, "patch_file_missing"
 
     patch_path = Path(patch_file)
+    # Resolve to absolute path to avoid relative path issues
+    if not patch_path.is_absolute():
+        patch_path = patch_path.resolve()
     if not patch_path.exists():
         return False, "patch_file_missing"
 
