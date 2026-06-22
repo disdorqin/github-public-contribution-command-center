@@ -76,24 +76,31 @@ def _cmd_llm_check() -> int:
 
 def _cmd_assisted_pr(
     target_issue_url: str,
+    mode: str,
     confirm_publish: bool,
     dry_run: bool = False,
     patch_workdir: str | None = None,
 ) -> int:
     """Handle assisted-pr command for external PR publishing."""
     try:
+        import json
+        import subprocess
+        from pathlib import Path
+
         from .external_pr_publisher import publish_external_pr, dry_run_external_pr
         from .policy import Policy
-        from pathlib import Path
-        import subprocess
 
         policy = Policy.load()
+
+        # Override policy.mode with CLI argument
+        policy.mode = mode
 
         if policy.mode != "assisted":
             print(json.dumps({
                 "ok": False,
                 "error": "assisted-pr requires --mode assisted",
                 "current_mode": policy.mode,
+                "hint": "Use: --mode assisted",
             }, indent=2))
             return 1
 
@@ -117,13 +124,15 @@ def _cmd_assisted_pr(
                 return 1
 
             # Check if there's an actual diff
-            rc, out, _ = subprocess.run(
+            proc = subprocess.run(
                 ["git", "diff"],
                 capture_output=True,
                 text=True,
                 check=False,
                 cwd=str(patch_path),
             )
+            rc = proc.returncode
+            out = proc.stdout
             if rc != 0 or not out.strip():
                 print(json.dumps({
                     "ok": False,
@@ -149,12 +158,14 @@ def _cmd_assisted_pr(
         patch_path = Path(patch_workdir) if patch_workdir else None
 
         # Generate PR title and body
-        rc, out, _ = subprocess.run(
+        proc = subprocess.run(
             ["gh", "issue", "view", target_issue_url, "--json", "title,body"],
             capture_output=True,
             text=True,
             check=False,
         )
+        rc = proc.returncode
+        out = proc.stdout
         pr_title = f"Fix issue #{parts[-1]}"
         pr_body = f"Address issue: {target_issue_url}"
         if rc == 0:
@@ -234,6 +245,12 @@ def main(argv: list[str] | None = None) -> int:
     p_assisted_pr = sub.add_parser("assisted-pr")
     p_assisted_pr.add_argument("--target-issue-url", required=True, help="Public issue URL")
     p_assisted_pr.add_argument(
+        "--mode",
+        default="safe",
+        choices=["safe", "assisted"],
+        help="Mode: safe (default) or assisted",
+    )
+    p_assisted_pr.add_argument(
         "--confirm-publish",
         required=True,
         choices=["true", "false"],
@@ -270,6 +287,7 @@ def main(argv: list[str] | None = None) -> int:
         confirm = args.confirm_publish == "true"
         return _cmd_assisted_pr(
             args.target_issue_url,
+            args.mode,
             confirm,
             args.dry_run,
             args.patch_workdir,
