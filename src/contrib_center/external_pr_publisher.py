@@ -243,24 +243,35 @@ def _validate_patch_limits(patch_workdir: Path) -> dict[str, Any]:
 def publish_external_pr(
     issue_url: str,
     upstream_repo: str,
-    patch_workdir: Path,
-    pr_title: str,
-    pr_body: str,
+    patch_workdir: Path | None = None,
+    patch_file: Path | None = None,
+    pr_title: str = "",
+    pr_body: str = "",
     policy: Policy | None = None,
     confirm_publish: bool = False,
 ) -> PublishResult:
     """Publish a PR to an external public repo using fork mode.
 
+    Supports two input modes:
+      1. patch_workdir: Generate patch from git diff in the workdir
+      2. patch_file: Directly read .diff file and git apply
+
+    Priority:
+      - If patch_file exists, use patch_file first
+      - Otherwise use patch_workdir
+      - If both are None/missing, refuse
+
     Steps:
       1. Validate mode + confirm_publish
-      2. Validate upstream repo is public
-      3. Check issue for deny keywords
-      4. Ensure fork exists (gh repo fork)
-      5. Clone fork, create branch
-      6. Apply patch, validate limits
-      7. Run tests if available
-      8. Commit, push to fork
-      9. Create PR from fork -> upstream
+      2. Validate patch_file or patch_workdir exists
+      3. Validate upstream repo is public
+      4. Check issue for deny keywords
+      5. Ensure fork exists (gh repo fork)
+      6. Clone fork, create branch
+      7. Apply patch (from patch_file or patch_workdir), validate limits
+      8. Run tests if available
+      9. Commit, push to fork
+      10. Create PR from fork -> upstream
 
     Returns PublishResult with details.
     """
@@ -281,14 +292,23 @@ def publish_external_pr(
             skipped_reason="confirm_publish_not_set",
         )
 
-    # Step 0.5: Validate patch_workdir exists (ONLY if confirm_publish=True)
-    if confirm_publish and (not patch_workdir or not patch_workdir.exists()):
-        return PublishResult(
-            ok=False,
-            upstream_repo=upstream_repo,
-            error="patch_workdir does not exist",
-            skipped_reason="patch_workdir_missing",
-        )
+    # Step 0.5: Validate patch_file or patch_workdir exists (ONLY if confirm_publish=True)
+    if confirm_publish:
+        # Check patch_file first (higher priority)
+        if patch_file and patch_file.exists():
+            # patch_file exists, will use it later
+            pass
+        elif patch_workdir and patch_workdir.exists():
+            # patch_workdir exists, will use it later
+            pass
+        else:
+            # Neither patch_file nor patch_workdir exists
+            return PublishResult(
+                ok=False,
+                upstream_repo=upstream_repo,
+                error="Neither patch_file nor patch_workdir exists",
+                skipped_reason="patch_file_missing",
+            )
 
     config = _load_external_config()
     fork_owner = config.get("forking", {}).get("fork_owner", "disdorqin")
@@ -394,54 +414,128 @@ def publish_external_pr(
             )
 
         # Step 5: Apply patch
-        # (patch_workdir already validated at Step 0.5)
+        # Priority: patch_file > patch_workdir
 
-        # Generate diff from patch_workdir
-        rc_diff, diff_out, err_diff = _run_cmd(
-            ["git", "diff"], cwd=str(patch_workdir)
-        )
-        if rc_diff != 0:
-            return PublishResult(
-                ok=False,
-                upstream_repo=upstream_repo,
-                fork_repo=fork_repo,
-                branch=branch,
-                error=err_diff[:300],
-                skipped_reason="patch_diff_failed",
-            )
-
-        # Check if diff is empty
-        if not diff_out.strip():
-            return PublishResult(
-                ok=False,
-                upstream_repo=upstream_repo,
-                fork_repo=fork_repo,
-                branch=branch,
-                skipped_reason="empty_patch",
-            )
-
-        # Apply diff to clone_dir
-        rc_apply, _, err_apply = _run_cmd(
-            ["git", "apply", "--index"],
-            cwd=str(clone_dir),
-            input_text=diff_out,
-        )
-        if rc_apply != 0:
-            # Try without --index as fallback
-            rc_apply2, _, err_apply2 = _run_cmd(
-                ["git", "apply"],
-                cwd=str(clone_dir),
-                input_text=diff_out,
-            )
-            if rc_apply2 != 0:
+        if patch_file and patch_file.exists():
+            # Use patch_file (read .diff file directly)
+            if not patch_file.exists():
                 return PublishResult(
                     ok=False,
                     upstream_repo=upstream_repo,
                     fork_repo=fork_repo,
                     branch=branch,
-                    error=f"git apply failed: {err_apply2[:200]}",
-                    skipped_reason="patch_apply_failed",
+                    error=f"patch_file does not exist: {patch_file}",
+                    skipped_reason="patch_file_missing",
                 )
+
+            # Read diff from file
+            diff_content = patch_file.read_text(encoding="utf-8")
+            if not diff_content.strip():
+                return PublishResult(
+                    ok=False,
+                    upstream_repo=upstream_repo,
+                    fork_repo=fork_repo,
+                    branch=branch,
+                    skipped_reason="empty_patch",
+                )
+
+            # Check if patch can be applied (dry-run)
+            rc_check, _, err_check = _run_cmd(
+                ["git", "apply", "--check"],
+                cwd=str(clone_dir),
+                input_text=diff_content,
+            )
+            if rc_check != 0:
+                return PublishResult(
+                    ok=False,
+                    upstream_repo=upstream_repo,
+                    fork_repo=fork_repo,
+                    branch=branch,
+                    error=f"git apply --check failed: {err_check[:200]}",
+                    skipped_reason="patch_apply_check_failed",
+                )
+
+            # Apply diff to clone_dir
+            rc_apply, _, err_apply = _run_cmd(
+                ["git", "apply", "--index"],
+                cwd=str(clone_dir),
+                input_text=diff_content,
+            )
+            if rc_apply != 0:
+                # Try without --index as fallback
+                rc_apply2, _, err_apply2 = _run_cmd(
+                    ["git", "apply"],
+                    cwd=str(clone_dir),
+                    input_text=diff_content,
+                )
+                if rc_apply2 != 0:
+                    return PublishResult(
+                        ok=False,
+                        upstream_repo=upstream_repo,
+                        fork_repo=fork_repo,
+                        branch=branch,
+                        error=f"git apply failed: {err_apply2[:200]}",
+                        skipped_reason="patch_apply_failed",
+                    )
+
+        elif patch_workdir and patch_workdir.exists():
+            # Use patch_workdir (generate diff from git diff)
+            # Generate diff from patch_workdir
+            rc_diff, diff_out, err_diff = _run_cmd(
+                ["git", "diff"], cwd=str(patch_workdir)
+            )
+            if rc_diff != 0:
+                return PublishResult(
+                    ok=False,
+                    upstream_repo=upstream_repo,
+                    fork_repo=fork_repo,
+                    branch=branch,
+                    error=err_diff[:300],
+                    skipped_reason="patch_diff_failed",
+                )
+
+            # Check if diff is empty
+            if not diff_out.strip():
+                return PublishResult(
+                    ok=False,
+                    upstream_repo=upstream_repo,
+                    fork_repo=fork_repo,
+                    branch=branch,
+                    skipped_reason="empty_patch",
+                )
+
+            # Apply diff to clone_dir
+            rc_apply, _, err_apply = _run_cmd(
+                ["git", "apply", "--index"],
+                cwd=str(clone_dir),
+                input_text=diff_out,
+            )
+            if rc_apply != 0:
+                # Try without --index as fallback
+                rc_apply2, _, err_apply2 = _run_cmd(
+                    ["git", "apply"],
+                    cwd=str(clone_dir),
+                    input_text=diff_out,
+                )
+                if rc_apply2 != 0:
+                    return PublishResult(
+                        ok=False,
+                        upstream_repo=upstream_repo,
+                        fork_repo=fork_repo,
+                        branch=branch,
+                        error=f"git apply failed: {err_apply2[:200]}",
+                        skipped_reason="patch_apply_failed",
+                    )
+        else:
+            # Neither patch_file nor patch_workdir available
+            return PublishResult(
+                ok=False,
+                upstream_repo=upstream_repo,
+                fork_repo=fork_repo,
+                branch=branch,
+                error="No patch source available",
+                skipped_reason="patch_file_missing",
+            )
 
         # Step 6: Validate patch limits (check staged or unstaged changes)
         # First, stage all applied changes

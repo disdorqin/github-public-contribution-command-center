@@ -12,6 +12,7 @@ In Safe Mode v1 we DO NOT call ``git push`` and we DO NOT call
   4. Collect a unified diff and the changed-file list.
   5. Best-effort run the project's tests if a manifest is present.
   6. Return a structured dict.
+  7. Persist the patch to data/patches/YYYY-MM-DD/ for later use.
 
 LLM Routing Support:
   - Reads LLM provider config from environment variables:
@@ -23,11 +24,14 @@ LLM Routing Support:
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 from .. import logger, visibility_guard
@@ -48,6 +52,8 @@ class PatchResult:
     mode: str = "safe"
     published: bool = False
     error: str | None = None
+    patch_file: str | None = None
+    patch_workdir: str | None = None
 
     def to_dict(self) -> dict:
         return self.__dict__.copy()
@@ -270,7 +276,73 @@ def generate_patch(
             f"NOTE: This PR was NOT published. It is a draft for human review.\n"
         )
 
-        # Persist the diff for the daily report.
+        # Persist the diff for the daily report and later PR publishing.
+        # Save to data/patches/YYYY-MM-DD/ for persistence
+        today = datetime.now().strftime("%Y-%m-%d")
+        repo_slug = repo_full_name.replace("/", "-")
+        
+        # Extract issue number from URL
+        issue_number = "unknown"
+        if "/issues/" in issue_url:
+            try:
+                issue_number = issue_url.split("/issues/")[-1].strip("/")
+            except Exception:
+                pass
+        
+        # Generate short hash from issue_url
+        short_hash = hashlib.sha256(issue_url.encode()).hexdigest()[:8]
+        
+        # Create patches directory
+        patches_dir = Path("data/patches") / today
+        patches_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Define patch file and metadata file paths
+        patch_filename = f"{repo_slug}-issue-{issue_number}-{short_hash}.diff"
+        metadata_filename = f"{repo_slug}-issue-{issue_number}-{short_hash}.json"
+        
+        patch_file_path = patches_dir / patch_filename
+        metadata_file_path = patches_dir / metadata_filename
+        
+        # Save diff to file
+        patch_file_path.write_text(diff, encoding="utf-8")
+        
+        # Update result with patch file paths
+        result.patch_file = str(patch_file_path)
+        result.patch_workdir = str(patches_dir)
+        
+        # Save metadata JSON
+        metadata = {
+            "issue_url": issue_url,
+            "repo": repo_full_name,
+            "score": score,
+            "changed_files": files,
+            "diff_lines": diff_lines,
+            "tests_passed": result.tests_passed,
+            "patch_file": str(patch_file_path),
+            "pr_title": result.pr_title,
+            "pr_body": result.pr_body,
+            "generated_at": datetime.now().isoformat(),
+        }
+        metadata_file_path.write_text(
+            json.dumps(metadata, indent=2, ensure_ascii=False),
+            encoding="utf-8"
+        )
+        
+        # Also log to patch_drafts.jsonl
+        patch_drafts_path = Path("data/patch_drafts.jsonl")
+        with open(patch_drafts_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(metadata, ensure_ascii=False) + "\n")
+        
+        logger.log_action(
+            "patch_persisted",
+            repo=repo_full_name,
+            issue=issue_url,
+            files=len(files),
+            diff_lines=diff_lines,
+            patch_file=str(patch_file_path),
+        )
+        
+        # Also save to temp output dir for backward compatibility
         diff_path = out_dir / "patch.diff"
         diff_path.write_text(diff, encoding="utf-8")
         logger.log_action(

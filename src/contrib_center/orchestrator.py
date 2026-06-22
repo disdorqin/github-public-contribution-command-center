@@ -1,6 +1,10 @@
 """Daily pipeline orchestrator.
 
 Implements the 14-step flow from the project spec.
+Supports three modes:
+  - safe: Only generate patches, never publish
+  - autopilot: Automatically publish 1 PR per day (if safe)
+  - assisted: Manual trigger with confirm_publish=true
 """
 
 from __future__ import annotations
@@ -123,6 +127,22 @@ def run(mode: str = "safe") -> dict[str, Any]:
     state.increment("external_pr_drafts", len(pr_drafts))
     state.increment("external_patches", counters["patches_generated"])
 
+    # Step 11.5: Autopilot mode - automatically publish 1 PR per day
+    autopilot_result = None
+    if mode == "autopilot":
+        _step("autopilot mode: attempting to publish one external PR")
+        try:
+            from .autopilot_publisher import autopilot_publish_one
+            autopilot_result = autopilot_publish_one(policy)
+            if autopilot_result.get("published"):
+                _step(f"autopilot: published PR -> {autopilot_result['pr_url']}")
+                actions.append(f"Autopilot published: {autopilot_result['pr_url']}")
+            else:
+                _step(f"autopilot: not published ({autopilot_result.get('reason', 'unknown')})")
+        except Exception as e:
+            logger.log_reject("autopilot_failed", error=str(e))
+            _step(f"autopilot: failed ({e})")
+
     # Step 12: daily report.
     report = {
         "mode": mode,
@@ -133,6 +153,7 @@ def run(mode: str = "safe") -> dict[str, Any]:
         "pr_drafts": pr_drafts,
         "rejected": rejected,
         "actions": actions,
+        "autopilot": autopilot_result,
     }
     report_path = report_bot.write(report)
     _step(f"daily report written: {report_path}")

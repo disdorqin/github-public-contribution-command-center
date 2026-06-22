@@ -1,0 +1,99 @@
+# Autopilot Configuration
+# Controls automatic external PR publishing behavior
+# This file is used when mode=autopilot
+
+# ---------------------------------------------------------------------------
+# Global enable/disable
+# ---------------------------------------------------------------------------
+enabled: true
+
+# ---------------------------------------------------------------------------
+# Rate limits
+# ---------------------------------------------------------------------------
+max_external_prs_per_day: 1
+max_external_prs_per_run: 1
+
+# ---------------------------------------------------------------------------
+# Allowed target groups (from open_source_targets.yml)
+# Only issues matching these groups will be considered for autopilot
+# ---------------------------------------------------------------------------
+allowed_groups:
+  - docs_first
+  - tests_first
+
+# ---------------------------------------------------------------------------
+# Forbidden target groups
+# Issues matching these groups will NEVER be processed by autopilot
+# ---------------------------------------------------------------------------
+forbidden_groups:
+  - code_small_fix
+  - config_fix
+
+# ---------------------------------------------------------------------------
+# Required checks before publishing
+# All must be true to publish
+# ---------------------------------------------------------------------------
+require_patch_generated: true
+require_public_repo: true
+require_public_issue: true
+require_issue_body_checked: true
+require_no_deny_keywords: true
+require_diff_limits: true
+require_tests_pass_or_not_available: true
+
+# ---------------------------------------------------------------------------
+# Publish settings
+# ---------------------------------------------------------------------------
+publish:
+  mode: fork_pr
+  fork_owner: disdorqin
+  create_external_issue: false
+  comment_external_issue: false
+  star_repo: false
+
+# ---------------------------------------------------------------------------
+# Cooldown rules (prevent spam)
+# ---------------------------------------------------------------------------
+cooldown:
+  same_upstream_repo_hours: 72
+  same_owner_hours: 24
+
+# ---------------------------------------------------------------------------
+# Scoring threshold
+# Only candidates with score >= min_score will be considered
+# ---------------------------------------------------------------------------
+min_score: 7.0
+
+# ---------------------------------------------------------------------------
+# PR body template
+# ---------------------------------------------------------------------------
+pr_body_template: |
+  ## Summary
+  {summary}
+
+  ## Linked issue
+  References: {issue_url}
+
+  ## Tests
+  {tests_summary}
+
+  ## Safety
+  - [x] Public repo verified
+  - [x] Public issue verified
+  - [x] No private/internal repo access
+  - [x] No security/auth/payment/credential issue handled
+  - [x] Diff within configured limits
+  - [x] No external issue/comment/star automation
+
+  ## Disclosure
+  This PR was prepared with AI assistance and submitted by an automated contribution workflow with strict safety gates.
+
+# ---------------------------------------------------------------------------
+# Safety rules (override from external_contribution.yml)
+# ---------------------------------------------------------------------------
+safety:
+  max_changed_files: 5
+  max_diff_lines: 200
+  forbid_binary_files: true
+  forbid_lockfile_only_changes: true
+  forbid_generated_files: true

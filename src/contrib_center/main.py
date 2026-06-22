@@ -80,6 +80,7 @@ def _cmd_assisted_pr(
     confirm_publish: bool,
     dry_run: bool = False,
     patch_workdir: str | None = None,
+    patch_file: str | None = None,
 ) -> int:
     """Handle assisted-pr command for external PR publishing."""
     try:
@@ -104,24 +105,37 @@ def _cmd_assisted_pr(
             }, indent=2))
             return 1
 
-        # Validate patch_workdir
+        # Validate patch_file or patch_workdir
         if confirm_publish and not dry_run:
-            if not patch_workdir:
+            if not patch_file and not patch_workdir:
                 print(json.dumps({
                     "ok": False,
-                    "error": "--patch-workdir is required when --confirm-publish=true",
+                    "error": "--patch-file or --patch-workdir is required when --confirm-publish=true",
                     "hint": "Use --dry-run to validate without publishing",
                 }, indent=2))
                 return 1
 
-            patch_path = Path(patch_workdir)
-            if not patch_path.exists():
-                print(json.dumps({
-                    "ok": False,
-                    "error": f"patch_workdir does not exist: {patch_workdir}",
-                    "skipped_reason": "patch_workdir_missing",
-                }, indent=2))
-                return 1
+            # Check patch_file if provided
+            if patch_file:
+                patch_path = Path(patch_file)
+                if not patch_path.exists():
+                    print(json.dumps({
+                        "ok": False,
+                        "error": f"patch_file does not exist: {patch_file}",
+                        "skipped_reason": "patch_file_missing",
+                    }, indent=2))
+                    return 1
+
+            # Check patch_workdir if provided (and patch_file not provided)
+            if not patch_file and patch_workdir:
+                patch_path = Path(patch_workdir)
+                if not patch_path.exists():
+                    print(json.dumps({
+                        "ok": False,
+                        "error": f"patch_workdir does not exist: {patch_workdir}",
+                        "skipped_reason": "patch_workdir_missing",
+                    }, indent=2))
+                    return 1
 
             # Check if there's an actual diff
             proc = subprocess.run(
@@ -154,8 +168,9 @@ def _cmd_assisted_pr(
 
         upstream_repo = f"{parts[-4]}/{parts[-3]}"
 
-        # Determine patch_workdir
-        patch_path = Path(patch_workdir) if patch_workdir else None
+        # Determine patch_file and patch_workdir
+        patch_file_path = Path(patch_file) if patch_file else None
+        patch_workdir_path = Path(patch_workdir) if patch_workdir else None
 
         # Generate PR title and body
         proc = subprocess.run(
@@ -170,7 +185,6 @@ def _cmd_assisted_pr(
         pr_body = f"Address issue: {target_issue_url}"
         if rc == 0:
             try:
-                import json
                 issue_data = json.loads(out)
                 pr_title = f"{issue_data.get('title', pr_title)} (#{parts[-1]})"
                 pr_body = issue_data.get("body", pr_body)[:500]  # Truncate
@@ -182,7 +196,8 @@ def _cmd_assisted_pr(
             result = dry_run_external_pr(
                 issue_url=target_issue_url,
                 upstream_repo=upstream_repo,
-                patch_workdir=patch_path,
+                patch_workdir=patch_workdir_path,
+                patch_file=patch_file_path,
                 pr_title=pr_title,
                 policy=policy,
             )
@@ -190,7 +205,8 @@ def _cmd_assisted_pr(
             result = publish_external_pr(
                 issue_url=target_issue_url,
                 upstream_repo=upstream_repo,
-                patch_workdir=patch_path,
+                patch_workdir=patch_workdir_path,
+                patch_file=patch_file_path,
                 pr_title=pr_title,
                 pr_body=pr_body,
                 policy=policy,
@@ -218,6 +234,46 @@ def _cmd_assisted_pr(
         }
         print(json.dumps(output, indent=2, default=str))
         return 0 if result.ok else 1
+
+    except Exception as e:
+        print(json.dumps({
+            "ok": False,
+            "error": str(e),
+        }, indent=2))
+        return 1
+
+
+def _cmd_autopilot_publish(dry_run: bool = False) -> int:
+    """Handle autopilot-publish command."""
+    try:
+        import json
+
+        from .autopilot_publisher import autopilot_publish_one
+        from .policy import Policy
+
+        policy = Policy.load()
+
+        if policy.mode != "autopilot":
+            print(json.dumps({
+                "ok": False,
+                "error": "autopilot-publish requires mode=autopilot",
+                "current_mode": policy.mode,
+                "hint": "Run with: python -m contrib_center.main run --mode autopilot",
+            }, indent=2))
+            return 1
+
+        if dry_run:
+            print(json.dumps({
+                "ok": True,
+                "dry_run": True,
+                "message": "Dry run - no PR will be published",
+            }, indent=2))
+            return 0
+
+        result = autopilot_publish_one(policy)
+
+        print(json.dumps(result, indent=2, default=str))
+        return 0 if result.get("ok") else 1
 
     except Exception as e:
         print(json.dumps({
@@ -266,6 +322,19 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Path to directory containing git diff (required for real publish)",
     )
+    p_assisted_pr.add_argument(
+        "--patch-file",
+        default=None,
+        help="Path to .diff file (alternative to --patch-workdir)",
+    )
+
+    # Autopilot publish command
+    p_autopilot = sub.add_parser("autopilot-publish")
+    p_autopilot.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Dry-run mode (no actual PR published)",
+    )
 
     p_check = sub.add_parser("check-visibility")
     p_check.add_argument("repo")
@@ -291,7 +360,10 @@ def main(argv: list[str] | None = None) -> int:
             confirm,
             args.dry_run,
             args.patch_workdir,
+            args.patch_file,
         )
+    if args.cmd == "autopilot-publish":
+        return _cmd_autopilot_publish(args.dry_run)
     if args.cmd == "check-visibility":
         return _cmd_check_visibility(args.repo)
     return 1

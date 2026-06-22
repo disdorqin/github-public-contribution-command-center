@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "safe or assisted"
+        description: "safe, assisted, or autopilot"
         required: true
         default: "safe"
         type: string
@@ -35,6 +35,10 @@ jobs:
       TZ: Asia/Singapore
       CONFIRM_PUBLISH: ${{ inputs.confirm_publish || 'false' }}
       TARGET_ISSUE_URL: ${{ inputs.target_issue_url || '' }}
+
+      # Environment variable to control whether cron can run autopilot
+      # Set this in GitHub repository variables (Settings > Variables)
+      ALLOW_CRON_AUTOPILOT: ${{ vars.ALLOW_CRON_AUTOPILOT || 'false' }}
 
       GH_TOKEN: ${{ secrets.PUBLIC_GITHUB_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.PUBLIC_GITHUB_TOKEN }}
@@ -82,13 +86,21 @@ jobs:
 
       - name: Run public contribution center
         run: |
-          # CRITICAL: cron-triggered runs MUST be safe mode
-          # Only workflow_dispatch can use assisted mode
+          # CRITICAL: cron-triggered runs mode determination
+          # Only workflow_dispatch can use assisted/autopilot mode
           if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
-            echo "[SECURITY] Cron-triggered run - forcing safe mode"
-            FORCED_MODE="safe"
+            echo "[SECURITY] Cron-triggered run"
+            # Check if autopilot is allowed for cron
+            if [ "$ALLOW_CRON_AUTOPILOT" = "true" ]; then
+              echo "[INFO] ALLOW_CRON_AUTOPILOT=true, using autopilot mode"
+              FORCED_MODE="autopilot"
+            else
+              echo "[INFO] ALLOW_CRON_AUTOPILOT=false, using safe mode"
+              FORCED_MODE="safe"
+            fi
             FORCED_CONFIRM="false"
           else
+            echo "[INFO] Manual trigger (workflow_dispatch)"
             FORCED_MODE="${MODE}"
             FORCED_CONFIRM="${CONFIRM_PUBLISH}"
           fi
