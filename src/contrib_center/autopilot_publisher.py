@@ -88,16 +88,30 @@ def _load_published_prs() -> list[dict]:
 
 
 def _can_publish_today(published: list[dict], config: dict) -> bool:
-    """Check if we can publish today (rate limit)."""
+    """Check if we can publish today (rate limit).
+    
+    Only counts successful PR publications (ok=True and has pr_url).
+    Failed attempts do not consume the daily quota.
+    """
     max_per_day = config.get("max_external_prs_per_day", 1)
     today = datetime.now().strftime("%Y-%m-%d")
 
-    today_count = sum(1 for pr in published if pr.get("date", "").startswith(today))
+    today_count = sum(
+        1
+        for pr in published
+        if pr.get("date", "").startswith(today)
+        and pr.get("ok") is True
+        and pr.get("pr_url")
+    )
     return today_count < max_per_day
 
 
 def _check_cooldown(repo: str, published: list[dict], config: dict) -> bool:
-    """Check cooldown rules (same repo/owner)."""
+    """Check cooldown rules (same repo/owner).
+    
+    Only counts successful PR publications (ok=True and has pr_url).
+    Failed attempts do not trigger cooldown.
+    """
     cooldown = config.get("cooldown", {})
     repo_hours = cooldown.get("same_upstream_repo_hours", 72)
     owner_hours = cooldown.get("same_owner_hours", 24)
@@ -106,6 +120,10 @@ def _check_cooldown(repo: str, published: list[dict], config: dict) -> bool:
     owner = repo.split("/")[0] if "/" in repo else ""
 
     for pr in published:
+        # Only consider successful PR publications for cooldown
+        if pr.get("ok") is not True or not pr.get("pr_url"):
+            continue
+            
         pr_date_str = pr.get("date", "")
         if not pr_date_str:
             continue
@@ -128,6 +146,18 @@ def _check_cooldown(repo: str, published: list[dict], config: dict) -> bool:
                     return False
 
     return True
+
+
+def _issue_already_published(issue_url: str, published: list[dict]) -> bool:
+    """Check if an issue already has a successful PR published.
+    
+    Only counts successful PR publications (ok=True and has pr_url).
+    Failed attempts do not block future attempts.
+    """
+    for pr in published:
+        if pr.get("ok") is True and pr.get("pr_url") and pr.get("issue_url") == issue_url:
+            return True
+    return False
 
 
 def _is_safe_candidate(metadata: dict, config: dict, policy: Policy) -> tuple[bool, str]:
@@ -233,6 +263,12 @@ def autopilot_publish_one(policy: Policy | None = None) -> dict:
     reject_reason = "no_safe_candidate"
 
     for metadata in metadata_list:
+        # Check if issue already published
+        issue_url = metadata.get("issue_url", "")
+        if _issue_already_published(issue_url, published):
+            reject_reason = "issue_already_published"
+            continue
+            
         is_safe, reason = _is_safe_candidate(metadata, config, policy)
         if is_safe:
             # Check cooldown

@@ -13,6 +13,7 @@ from src.contrib_center.autopilot_publisher import (
     _can_publish_today,
     _check_cooldown,
     _is_safe_candidate,
+    _issue_already_published,
     _load_patch_metadata,
     _load_published_prs,
     autopilot_publish_one,
@@ -159,11 +160,20 @@ class TestCanPublishToday:
         assert _can_publish_today(published, config) is True
 
     def test_rate_limit_reached(self):
-        """Test when rate limit reached."""
+        """Test when rate limit reached (only count successful PRs)."""
         config = {"max_external_prs_per_day": 1}
         today = datetime.now().strftime("%Y-%m-%d")
-        published = [{"date": f"{today}T10:00:00"}]
+        # Only ok=True and has pr_url counts
+        published = [{"date": f"{today}T10:00:00", "ok": True, "pr_url": "https://github.com/owner/repo/pull/1"}]
         assert _can_publish_today(published, config) is False
+        
+    def test_failed_attempt_does_not_count(self):
+        """Test that failed attempts don't consume daily quota."""
+        config = {"max_external_prs_per_day": 1}
+        today = datetime.now().strftime("%Y-%m-%d")
+        # Failed attempt (ok=False) should not count
+        published = [{"date": f"{today}T10:00:00", "ok": False, "pr_url": None}]
+        assert _can_publish_today(published, config) is True
 
     def test_multiple_prs_allowed(self):
         """Test when multiple PRs allowed per day."""
@@ -186,16 +196,59 @@ class TestCheckCooldown:
         assert _check_cooldown("owner/repo", published, config) is True
 
     def test_same_repo_cooldown(self):
-        """Test cooldown for same repo."""
+        """Test cooldown for same repo (only successful PRs)."""
         config = {"cooldown": {"same_upstream_repo_hours": 72}}
-        published = [{"date": datetime.now().isoformat(), "repo": "owner/repo"}]
+        # Only ok=True and has pr_url triggers cooldown
+        published = [{"date": datetime.now().isoformat(), "repo": "owner/repo", "ok": True, "pr_url": "https://github.com/owner/repo/pull/1"}]
         assert _check_cooldown("owner/repo", published, config) is False
 
     def test_same_owner_cooldown(self):
-        """Test cooldown for same owner."""
+        """Test cooldown for same owner (only successful PRs)."""
         config = {"cooldown": {"same_owner_hours": 24}}
-        published = [{"date": datetime.now().isoformat(), "repo": "owner/repo1"}]
+        # Only ok=True and has pr_url triggers cooldown
+        published = [{"date": datetime.now().isoformat(), "repo": "owner/repo1", "ok": True, "pr_url": "https://github.com/owner/repo1/pull/1"}]
         assert _check_cooldown("owner/repo2", published, config) is False
+
+    def test_failed_pr_does_not_trigger_cooldown(self):
+        """Test that failed PRs don't trigger cooldown."""
+        config = {"cooldown": {"same_upstream_repo_hours": 72}}
+        # Failed attempt (ok=False) should not trigger cooldown
+        published = [{"date": datetime.now().isoformat(), "repo": "owner/repo", "ok": False, "pr_url": None}]
+        assert _check_cooldown("owner/repo", published, config) is True
+
+
+class TestIssueAlreadyPublished:
+    """Test _issue_already_published function."""
+
+    def test_issue_already_published(self):
+        """Test when issue already has successful PR."""
+        published = [
+            {"ok": True, "pr_url": "https://github.com/owner/repo/pull/1", "issue_url": "https://github.com/owner/repo/issues/1"},
+        ]
+        assert _issue_already_published("https://github.com/owner/repo/issues/1", published) is True
+
+    def test_issue_not_published(self):
+        """Test when issue not published."""
+        published = [
+            {"ok": True, "pr_url": "https://github.com/owner/repo/pull/1", "issue_url": "https://github.com/owner/repo/issues/2"},
+        ]
+        assert _issue_already_published("https://github.com/owner/repo/issues/1", published) is False
+
+    def test_failed_attempt_does_not_block(self):
+        """Test that failed attempts don't block future attempts."""
+        published = [
+            {"ok": False, "pr_url": None, "issue_url": "https://github.com/owner/repo/issues/1"},
+        ]
+        # Failed attempt should not block
+        assert _issue_already_published("https://github.com/owner/repo/issues/1", published) is False
+
+    def test_no_pr_url_does_not_block(self):
+        """Test that entries without pr_url don't block."""
+        published = [
+            {"ok": True, "pr_url": "", "issue_url": "https://github.com/owner/repo/issues/1"},
+        ]
+        # Empty pr_url should not block
+        assert _issue_already_published("https://github.com/owner/repo/issues/1", published) is False
 
 
 class TestIsSafeCandidate:
@@ -361,17 +414,36 @@ class TestAutopilotPublishOne:
     @patch("src.contrib_center.autopilot_publisher._load_autopilot_config")
     @patch("src.contrib_center.autopilot_publisher._load_published_prs")
     def test_rate_limit(self, mock_load_prs, mock_load_config):
-        """Test rate limit reached."""
+        """Test rate limit reached (only successful PRs count)."""
         mock_load_config.return_value = {"enabled": True, "max_external_prs_per_day": 1}
 
         today = datetime.now().strftime("%Y-%m-%d")
-        mock_load_prs.return_value = [{"date": f"{today}T10:00:00"}]
+        # Only ok=True and has pr_url counts
+        mock_load_prs.return_value = [{"date": f"{today}T10:00:00", "ok": True, "pr_url": "https://github.com/owner/repo/pull/1"}]
 
         result = autopilot_publish_one()
 
         assert result["ok"] is True
         assert result["published"] is False
         assert result["reason"] == "rate_limit_reached"
+
+    @patch("src.contrib_center.autopilot_publisher._load_autopilot_config")
+    @patch("src.contrib_center.autopilot_publisher._load_published_prs")
+    def test_failed_attempt_does_not_count(self, mock_load_prs, mock_load_config):
+        """Test that failed attempts don't consume daily quota."""
+        mock_load_config.return_value = {"enabled": True, "max_external_prs_per_day": 1}
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        # Failed attempt (ok=False) should not count
+        mock_load_prs.return_value = [{"date": f"{today}T10:00:00", "ok": False, "pr_url": None}]
+
+        # Should not trigger rate_limit_reached, will return no_patch_generated
+        mock_load_metadata = MagicMock(return_value=[])
+        with patch("src.contrib_center.autopilot_publisher._load_patch_metadata", mock_load_metadata):
+            result = autopilot_publish_one()
+
+        assert result["ok"] is True
+        assert result["reason"] == "no_patch_generated"
 
     @patch("src.contrib_center.autopilot_publisher._load_autopilot_config")
     @patch("src.contrib_center.autopilot_publisher._load_published_prs")

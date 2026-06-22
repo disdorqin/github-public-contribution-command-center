@@ -295,20 +295,33 @@ def publish_external_pr(
 
     # Step 0.5: Validate patch_file or patch_workdir exists (ONLY if confirm_publish=True)
     if confirm_publish:
-        # Check patch_file first (higher priority)
-        if patch_file and patch_file.exists():
-            # patch_file exists, will use it later
-            pass
-        elif patch_workdir and patch_workdir.exists():
-            # patch_workdir exists, will use it later
-            pass
+        # Check patch_file
+        if patch_file:
+            # patch_file explicitly provided, must exist
+            if not patch_file.exists():
+                return PublishResult(
+                    ok=False,
+                    upstream_repo=upstream_repo,
+                    error=f"patch_file does not exist: {patch_file}",
+                    skipped_reason="patch_file_missing",
+                )
+        # Check patch_workdir
+        elif patch_workdir:
+            # patch_workdir explicitly provided, must exist
+            if not patch_workdir.exists():
+                return PublishResult(
+                    ok=False,
+                    upstream_repo=upstream_repo,
+                    error=f"patch_workdir does not exist: {patch_workdir}",
+                    skipped_reason="patch_workdir_missing",
+                )
         else:
-            # Neither patch_file nor patch_workdir exists
+            # Neither patch_file nor patch_workdir provided
             return PublishResult(
                 ok=False,
                 upstream_repo=upstream_repo,
-                error="Neither patch_file nor patch_workdir exists",
-                skipped_reason="patch_file_missing",
+                error="Neither patch_file nor patch_workdir provided",
+                skipped_reason="patch_source_missing",
             )
 
     config = _load_external_config()
@@ -638,6 +651,15 @@ def publish_external_pr(
                     skipped_reason="tests_failed",
                 )
 
+        # Set tests_passed in stats for PR body
+        stats["tests_passed"] = tests_passed
+        if tests_passed is True:
+            stats["tests_summary"] = "tests passed"
+        elif tests_passed is False:
+            stats["tests_summary"] = "tests failed"
+        else:
+            stats["tests_summary"] = "tests not available"
+
         # Step 8: Commit
         commit_msg = f"fix: address issue #{issue_number}\n\nReference: {issue_url}"
         _run_cmd(["git", "add", "."], cwd=str(clone_dir))
@@ -858,9 +880,17 @@ def dry_run_external_pr(
     # Validate patch_file or patch_workdir
     stats = {}
 
-    # Check patch_file first (higher priority)
-    if patch_file and patch_file.exists():
-        # Validate patch_file
+    # Check patch_file
+    if patch_file:
+        # patch_file explicitly provided, must exist
+        if not patch_file.exists():
+            return PublishResult(
+                ok=False,
+                upstream_repo=upstream_repo,
+                fork_repo=fork_repo,
+                error=f"patch_file does not exist: {patch_file}",
+                skipped_reason="patch_file_missing",
+            )
         if not patch_file.is_file():
             return PublishResult(
                 ok=False,
@@ -869,7 +899,6 @@ def dry_run_external_pr(
                 error=f"patch_file is not a file: {patch_file}",
                 skipped_reason="patch_file_not_file",
             )
-
         if patch_file.suffix != ".diff":
             return PublishResult(
                 ok=False,
@@ -878,7 +907,7 @@ def dry_run_external_pr(
                 error=f"patch_file must have .diff extension: {patch_file}",
                 skipped_reason="patch_file_not_diff",
             )
-
+        
         diff_content = patch_file.read_text(encoding="utf-8")
         if not diff_content.strip():
             return PublishResult(
@@ -888,7 +917,7 @@ def dry_run_external_pr(
                 error=f"patch_file is empty: {patch_file}",
                 skipped_reason="empty_patch",
             )
-
+        
         # For patch_file, we can't validate patch limits without applying
         # Just record basic stats
         stats = {
@@ -896,9 +925,18 @@ def dry_run_external_pr(
             "patch_file": str(patch_file),
             "patch_source": "patch_file",
         }
-
-    # Check patch_workdir (lower priority)
-    elif patch_workdir and patch_workdir.exists():
+    
+    # Check patch_workdir
+    elif patch_workdir:
+        # patch_workdir explicitly provided, must exist
+        if not patch_workdir.exists():
+            return PublishResult(
+                ok=False,
+                upstream_repo=upstream_repo,
+                fork_repo=fork_repo,
+                error=f"patch_workdir does not exist: {patch_workdir}",
+                skipped_reason="patch_workdir_missing",
+            )
         if not patch_workdir.is_dir():
             return PublishResult(
                 ok=False,
@@ -907,7 +945,7 @@ def dry_run_external_pr(
                 error=f"patch_workdir is not a directory: {patch_workdir}",
                 skipped_reason="patch_workdir_not_dir",
             )
-
+        
         # Validate patch limits
         stats = _validate_patch_limits(patch_workdir)
         if not stats["ok"]:
@@ -919,14 +957,14 @@ def dry_run_external_pr(
                 skipped_reason="patch_limits_exceeded",
                 patch_stats=stats,
             )
-
+    
     else:
-        # Neither patch_file nor patch_workdir available
+        # Neither patch_file nor patch_workdir provided
         return PublishResult(
             ok=False,
             upstream_repo=upstream_repo,
             fork_repo=fork_repo,
-            error="No patch source available (patch_file or patch_workdir required)",
+            error="No patch source provided (patch_file or patch_workdir required)",
             skipped_reason="patch_source_missing",
         )
 
