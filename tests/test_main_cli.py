@@ -55,7 +55,7 @@ class TestAssistedPrCLI:
 
         assert result == 1
 
-    @patch("src.contrib_center.main.dry_run_external_pr")
+    @patch("src.contrib_center.external_pr_publisher.dry_run_external_pr")
     def test_dry_run_no_publish(self, mock_dry_run):
         """Test that dry-run doesn't publish."""
         mock_dry_run.return_value = MagicMock(
@@ -94,7 +94,7 @@ class TestAutopilotPublishCLI:
 
     @patch("src.contrib_center.autopilot_publisher.autopilot_publish_one")
     @patch("src.contrib_center.main.Policy")
-    def test_dry_run_no_publish(self, mock_autopilot, mock_policy):
+    def test_dry_run_no_publish(self, mock_policy, mock_autopilot):
         """Test that dry-run doesn't publish."""
         mock_policy_instance = MagicMock()
         mock_policy_instance.mode = "autopilot"
@@ -108,7 +108,7 @@ class TestAutopilotPublishCLI:
 
     @patch("src.contrib_center.autopilot_publisher.autopilot_publish_one")
     @patch("src.contrib_center.main.Policy")
-    def test_autopilot_mode_publishes(self, mock_autopilot, mock_policy):
+    def test_autopilot_mode_publishes(self, mock_policy, mock_autopilot):
         """Test that autopilot mode publishes."""
         mock_policy_instance = MagicMock()
         mock_policy_instance.mode = "autopilot"
