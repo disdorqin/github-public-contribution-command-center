@@ -29,13 +29,13 @@ class TestLoadPatchMetadata:
         """Test when patches directory doesn't exist."""
         result = _load_patch_metadata("2099-01-01")
         assert result == []
-
+        
     def test_load_valid_metadata(self):
         """Test loading valid patch metadata."""
         with tempfile.TemporaryDirectory() as tmpdir:
             patches_dir = Path(tmpdir) / "data" / "patches" / "2026-06-21"
             patches_dir.mkdir(parents=True)
-
+            
             # Create a valid metadata JSON
             metadata = {
                 "repo": "owner/repo",
@@ -43,19 +43,21 @@ class TestLoadPatchMetadata:
                 "score": 8.5,
                 "changed_files": ["README.md"],
                 "diff_lines": 10,
+                "patch_generated": True,
+                "patch_file": str(patches_dir / "patch_001.diff"),
             }
             json_file = patches_dir / "patch_001.json"
             with open(json_file, "w", encoding="utf-8") as f:
                 json.dump(metadata, f)
-
+            
             # Create corresponding .diff file
             diff_file = patches_dir / "patch_001.diff"
             diff_file.write_text("diff --git a/README.md b/README.md\n")
-
+            
             # Change to tmpdir so relative paths work
             old_cwd = os.getcwd()
             os.chdir(tmpdir)
-
+            
             try:
                 result = _load_patch_metadata("2026-06-21")
                 assert len(result) == 1
@@ -64,26 +66,26 @@ class TestLoadPatchMetadata:
                 assert "patch_001.diff" in result[0]["patch_file"]
             finally:
                 os.chdir(old_cwd)
-
+                
     def test_skip_invalid_json(self):
         """Test skipping invalid JSON files."""
         with tempfile.TemporaryDirectory() as tmpdir:
             patches_dir = Path(tmpdir) / "data" / "patches" / "2026-06-21"
             patches_dir.mkdir(parents=True)
-
+            
             # Create invalid JSON
             invalid_file = patches_dir / "invalid.json"
             invalid_file.write_text("{invalid json}")
-
+            
             # Create valid JSON
-            valid_metadata = {"repo": "owner/repo", "score": 8.0}
+            valid_metadata = {"repo": "owner/repo", "score": 8.0, "patch_generated": True}
             valid_file = patches_dir / "valid.json"
             with open(valid_file, "w", encoding="utf-8") as f:
                 json.dump(valid_metadata, f)
-
+            
             old_cwd = os.getcwd()
             os.chdir(tmpdir)
-
+            
             try:
                 result = _load_patch_metadata("2026-06-21")
                 assert len(result) == 1
@@ -99,14 +101,14 @@ class TestLoadPublishedPRs:
         """Test when published_prs.jsonl doesn't exist."""
         result = _load_published_prs()
         assert result == []
-
+        
     def test_load_valid_entries(self):
         """Test loading valid published PRs."""
         with tempfile.TemporaryDirectory() as tmpdir:
             data_dir = Path(tmpdir) / "data"
             data_dir.mkdir()
             published_file = data_dir / "published_prs.jsonl"
-
+            
             # Write valid entries
             entries = [
                 {"date": "2026-06-21T10:00:00", "repo": "owner/repo1"},
@@ -115,10 +117,10 @@ class TestLoadPublishedPRs:
             with open(published_file, "w", encoding="utf-8") as f:
                 for entry in entries:
                     f.write(json.dumps(entry) + "\n")
-
+            
             old_cwd = os.getcwd()
             os.chdir(tmpdir)
-
+            
             try:
                 result = _load_published_prs()
                 assert len(result) == 2
@@ -126,23 +128,23 @@ class TestLoadPublishedPRs:
                 assert result[1]["repo"] == "owner/repo2"
             finally:
                 os.chdir(old_cwd)
-
+                
     def test_skip_invalid_lines(self):
         """Test skipping invalid lines in jsonl."""
         with tempfile.TemporaryDirectory() as tmpdir:
             data_dir = Path(tmpdir) / "data"
             data_dir.mkdir()
             published_file = data_dir / "published_prs.jsonl"
-
+            
             # Write mix of valid and invalid
             with open(published_file, "w", encoding="utf-8") as f:
                 f.write(json.dumps({"date": "2026-06-21", "repo": "owner/repo"}) + "\n")
                 f.write("invalid json line\n")
                 f.write(json.dumps({"date": "2026-06-22", "repo": "owner/repo2"}) + "\n")
-
+            
             old_cwd = os.getcwd()
             os.chdir(tmpdir)
-
+            
             try:
                 result = _load_published_prs()
                 assert len(result) == 2
@@ -158,7 +160,7 @@ class TestCanPublishToday:
         config = {"max_external_prs_per_day": 1}
         published = []
         assert _can_publish_today(published, config) is True
-
+        
     def test_rate_limit_reached(self):
         """Test when rate limit reached (only count successful PRs)."""
         config = {"max_external_prs_per_day": 1}
@@ -174,7 +176,7 @@ class TestCanPublishToday:
         # Failed attempt (ok=False) should not count
         published = [{"date": f"{today}T10:00:00", "ok": False, "pr_url": None}]
         assert _can_publish_today(published, config) is True
-
+        
     def test_multiple_prs_allowed(self):
         """Test when multiple PRs allowed per day."""
         config = {"max_external_prs_per_day": 3}
@@ -194,21 +196,21 @@ class TestCheckCooldown:
         config = {}
         published = []
         assert _check_cooldown("owner/repo", published, config) is True
-
+        
     def test_same_repo_cooldown(self):
         """Test cooldown for same repo (only successful PRs)."""
         config = {"cooldown": {"same_upstream_repo_hours": 72}}
         # Only ok=True and has pr_url triggers cooldown
         published = [{"date": datetime.now().isoformat(), "repo": "owner/repo", "ok": True, "pr_url": "https://github.com/owner/repo/pull/1"}]
         assert _check_cooldown("owner/repo", published, config) is False
-
+        
     def test_same_owner_cooldown(self):
         """Test cooldown for same owner (only successful PRs)."""
         config = {"cooldown": {"same_owner_hours": 24}}
         # Only ok=True and has pr_url triggers cooldown
         published = [{"date": datetime.now().isoformat(), "repo": "owner/repo1", "ok": True, "pr_url": "https://github.com/owner/repo1/pull/1"}]
         assert _check_cooldown("owner/repo2", published, config) is False
-
+        
     def test_failed_pr_does_not_trigger_cooldown(self):
         """Test that failed PRs don't trigger cooldown."""
         config = {"cooldown": {"same_upstream_repo_hours": 72}}
@@ -226,14 +228,14 @@ class TestIssueAlreadyPublished:
             {"ok": True, "pr_url": "https://github.com/owner/repo/pull/1", "issue_url": "https://github.com/owner/repo/issues/1"},
         ]
         assert _issue_already_published("https://github.com/owner/repo/issues/1", published) is True
-
+        
     def test_issue_not_published(self):
         """Test when issue not published."""
         published = [
             {"ok": True, "pr_url": "https://github.com/owner/repo/pull/1", "issue_url": "https://github.com/owner/repo/issues/2"},
         ]
         assert _issue_already_published("https://github.com/owner/repo/issues/1", published) is False
-
+        
     def test_failed_attempt_does_not_block(self):
         """Test that failed attempts don't block future attempts."""
         published = [
@@ -241,7 +243,7 @@ class TestIssueAlreadyPublished:
         ]
         # Failed attempt should not block
         assert _issue_already_published("https://github.com/owner/repo/issues/1", published) is False
-
+        
     def test_no_pr_url_does_not_block(self):
         """Test that entries without pr_url don't block."""
         published = [
@@ -260,6 +262,7 @@ class TestIsSafeCandidate:
         mock_guard.return_value = True
         config = {
             "min_score": 7.0,
+            "require_patch_generated": True,
             "safety": {"max_changed_files": 5, "max_diff_lines": 200},
         }
         policy = Policy.load()
@@ -267,17 +270,110 @@ class TestIsSafeCandidate:
             "repo": "owner/repo",
             "issue_url": "https://github.com/owner/repo/issues/1",
             "score": 8.5,
+            "patch_generated": True,
             "patch_file": "/tmp/patch.diff",
             "changed_files": ["README.md"],
             "diff_lines": 10,
         }
-
+        
         # Mock Path.exists()
         with patch("pathlib.Path.exists", return_value=True):
-            is_safe, reason = _is_safe_candidate(metadata, config, policy)
-            assert is_safe is True
-            assert reason == ""
+            with patch("pathlib.Path.is_file", return_value=True):
+                with patch("pathlib.Path.read_text", return_value="diff --git a/file.txt b/file.txt\n"):
+                    is_safe, reason = _is_safe_candidate(metadata, config, policy)
+                    assert is_safe is True
+                    assert reason == ""
+                    
+    @patch("src.contrib_center.autopilot_publisher.guard_external_public_repo_read")
+    def test_patch_not_generated(self, mock_guard):
+        """Test candidate with patch_generated=false."""
+        mock_guard.return_value = True
+        config = {
+            "min_score": 7.0,
+            "require_patch_generated": True,
+        }
+        policy = Policy.load()
+        metadata = {
+            "repo": "owner/repo",
+            "issue_url": "https://github.com/owner/repo/issues/1",
+            "score": 8.5,
+            "patch_generated": False,  # Patch not generated
+        }
+        
+        is_safe, reason = _is_safe_candidate(metadata, config, policy)
+        assert is_safe is False
+        assert reason == "patch_not_generated"
 
+    @patch("src.contrib_center.autopilot_publisher.guard_external_public_repo_read")
+    def test_empty_patch_file(self, mock_guard):
+        """Test candidate with empty patch file."""
+        mock_guard.return_value = True
+        config = {
+            "min_score": 7.0,
+            "require_patch_generated": True,
+        }
+        policy = Policy.load()
+        metadata = {
+            "repo": "owner/repo",
+            "issue_url": "https://github.com/owner/repo/issues/1",
+            "score": 8.5,
+            "patch_generated": True,
+            "patch_file": "/tmp/empty.diff",
+        }
+        
+        with patch("pathlib.Path.exists", return_value=True):
+            with patch("pathlib.Path.is_file", return_value=True):
+                with patch("pathlib.Path.read_text", return_value=""):  # Empty file
+                    is_safe, reason = _is_safe_candidate(metadata, config, policy)
+                    assert is_safe is False
+                    assert reason == "empty_patch"
+
+    @patch("src.contrib_center.autopilot_publisher.guard_external_public_repo_read")
+    def test_patch_file_not_diff(self, mock_guard):
+        """Test candidate with patch_file not .diff."""
+        mock_guard.return_value = True
+        config = {
+            "min_score": 7.0,
+            "require_patch_generated": True,
+        }
+        policy = Policy.load()
+        metadata = {
+            "repo": "owner/repo",
+            "issue_url": "https://github.com/owner/repo/issues/1",
+            "score": 8.5,
+            "patch_generated": True,
+            "patch_file": "/tmp/patch.txt",  # Not .diff
+        }
+        
+        with patch("pathlib.Path.exists", return_value=True):
+            with patch("pathlib.Path.is_file", return_value=True):
+                is_safe, reason = _is_safe_candidate(metadata, config, policy)
+                assert is_safe is False
+                assert reason == "patch_file_not_diff"
+
+    @patch("src.contrib_center.autopilot_publisher.guard_external_public_repo_read")
+    def test_patch_file_is_directory(self, mock_guard):
+        """Test candidate with patch_file being a directory."""
+        mock_guard.return_value = True
+        config = {
+            "min_score": 7.0,
+            "require_patch_generated": True,
+        }
+        policy = Policy.load()
+        metadata = {
+            "repo": "owner/repo",
+            "issue_url": "https://github.com/owner/repo/issues/1",
+            "score": 8.5,
+            "patch_generated": True,
+            "patch_file": "/tmp/patches",  # Directory
+        }
+        
+        with patch("pathlib.Path.exists", return_value=True):
+            with patch("pathlib.Path.is_file", return_value=False):  # It's a directory
+                is_safe, reason = _is_safe_candidate(metadata, config, policy)
+                assert is_safe is False
+                assert reason == "patch_file_not_file"
+                    
     @patch("src.contrib_center.autopilot_publisher.guard_external_public_repo_read")
     def test_score_too_low(self, mock_guard):
         """Test candidate with low score."""
@@ -288,27 +384,31 @@ class TestIsSafeCandidate:
             "repo": "owner/repo",
             "score": 5.0,
         }
-
+        
         is_safe, reason = _is_safe_candidate(metadata, config, policy)
         assert is_safe is False
         assert reason == "score_too_low"
-
+        
     @patch("src.contrib_center.autopilot_publisher.guard_external_public_repo_read")
     def test_patch_file_missing(self, mock_guard):
         """Test candidate with missing patch file."""
         mock_guard.return_value = True
-        config = {"min_score": 7.0}
+        config = {
+            "min_score": 7.0,
+            "require_patch_generated": True,
+        }
         policy = Policy.load()
         metadata = {
             "repo": "owner/repo",
             "score": 8.0,
+            "patch_generated": True,  # Add patch_generated field
             "patch_file": "/tmp/nonexistent.diff",
         }
-
+        
         is_safe, reason = _is_safe_candidate(metadata, config, policy)
         assert is_safe is False
         assert reason == "patch_file_missing"
-
+        
     @patch("src.contrib_center.autopilot_publisher.guard_external_public_repo_read")
     def test_too_many_files(self, mock_guard):
         """Test candidate with too many changed files."""
@@ -323,15 +423,18 @@ class TestIsSafeCandidate:
             "repo": "owner/repo",
             "score": 8.0,
             "patch_file": "/tmp/patch.diff",
+            "patch_generated": True,
             "changed_files": ["file1.py", "file2.py", "file3.py", "file4.py", "file5.py", "file6.py"],
             "diff_lines": 10,
         }
-
+        
         with patch("pathlib.Path.exists", return_value=True):
-            is_safe, reason = _is_safe_candidate(metadata, config, policy)
-            assert is_safe is False
-            assert reason == "too_many_files"
-
+            with patch("pathlib.Path.is_file", return_value=True):
+                with patch("pathlib.Path.read_text", return_value="diff --git a/file.txt b/file.txt\n"):
+                    is_safe, reason = _is_safe_candidate(metadata, config, policy)
+                    assert is_safe is False
+                    assert reason == "too_many_files"
+                    
     @patch("src.contrib_center.autopilot_publisher.guard_external_public_repo_read")
     def test_tests_failed(self, mock_guard):
         """Test candidate with failed tests."""
@@ -345,13 +448,16 @@ class TestIsSafeCandidate:
             "repo": "owner/repo",
             "score": 8.0,
             "patch_file": "/tmp/patch.diff",
+            "patch_generated": True,
             "tests_passed": False,
         }
-
+        
         with patch("pathlib.Path.exists", return_value=True):
-            is_safe, reason = _is_safe_candidate(metadata, config, policy)
-            assert is_safe is False
-            assert reason == "tests_failed"
+            with patch("pathlib.Path.is_file", return_value=True):
+                with patch("pathlib.Path.read_text", return_value="diff --git a/file.txt b/file.txt\n"):
+                    is_safe, reason = _is_safe_candidate(metadata, config, policy)
+                    assert is_safe is False
+                    assert reason == "tests_failed"
 
 
 class TestAutopilotPublishOne:
@@ -367,21 +473,22 @@ class TestAutopilotPublishOne:
         # Setup mocks
         mock_guard.return_value = True
         mock_load_config.return_value = {"enabled": True, "max_external_prs_per_day": 1}
-
+        
         mock_load_prs.return_value = []
-
+        
         today = datetime.now().strftime("%Y-%m-%d")
         mock_load_metadata.return_value = [
             {
                 "repo": "owner/repo",
                 "issue_url": "https://github.com/owner/repo/issues/1",
                 "score": 8.5,
+                "patch_generated": True,
                 "patch_file": "/tmp/patch.diff",
                 "changed_files": ["README.md"],
                 "diff_lines": 10,
             }
         ]
-
+        
         mock_publish.return_value = PublishResult(
             ok=True,
             upstream_repo="owner/repo",
@@ -389,62 +496,64 @@ class TestAutopilotPublishOne:
             branch="contrib-center/repo/1-abc123",
             pr_url="https://github.com/owner/repo/pull/123",
         )
-
+        
         # Mock Path.exists()
         with patch("pathlib.Path.exists", return_value=True):
-            with patch("builtins.open", create=True):
-                result = autopilot_publish_one()
-
+            with patch("pathlib.Path.is_file", return_value=True):
+                with patch("pathlib.Path.read_text", return_value="diff --git a/file.txt b/file.txt\n"):
+                    with patch("builtins.open", create=True):
+                        result = autopilot_publish_one()
+        
         assert result["ok"] is True
         assert result["published"] is True
         assert result["repo"] == "owner/repo"
         assert "pr_url" in result
-
+        
     @patch("src.contrib_center.autopilot_publisher._load_autopilot_config")
     def test_autopilot_disabled(self, mock_load_config):
         """Test when autopilot is disabled."""
         mock_load_config.return_value = {"enabled": False}
-
+        
         result = autopilot_publish_one()
-
+        
         assert result["ok"] is True
         assert result["published"] is False
         assert result["reason"] == "autopilot_disabled"
-
+        
     @patch("src.contrib_center.autopilot_publisher._load_autopilot_config")
     @patch("src.contrib_center.autopilot_publisher._load_published_prs")
     def test_rate_limit(self, mock_load_prs, mock_load_config):
         """Test rate limit reached (only successful PRs count)."""
         mock_load_config.return_value = {"enabled": True, "max_external_prs_per_day": 1}
-
+        
         today = datetime.now().strftime("%Y-%m-%d")
         # Only ok=True and has pr_url counts
         mock_load_prs.return_value = [{"date": f"{today}T10:00:00", "ok": True, "pr_url": "https://github.com/owner/repo/pull/1"}]
-
+        
         result = autopilot_publish_one()
-
+        
         assert result["ok"] is True
         assert result["published"] is False
         assert result["reason"] == "rate_limit_reached"
-
+        
     @patch("src.contrib_center.autopilot_publisher._load_autopilot_config")
     @patch("src.contrib_center.autopilot_publisher._load_published_prs")
     def test_failed_attempt_does_not_count(self, mock_load_prs, mock_load_config):
         """Test that failed attempts don't consume daily quota."""
         mock_load_config.return_value = {"enabled": True, "max_external_prs_per_day": 1}
-
+        
         today = datetime.now().strftime("%Y-%m-%d")
         # Failed attempt (ok=False) should not count
         mock_load_prs.return_value = [{"date": f"{today}T10:00:00", "ok": False, "pr_url": None}]
-
+        
         # Should not trigger rate_limit_reached, will return no_patch_generated
         mock_load_metadata = MagicMock(return_value=[])
         with patch("src.contrib_center.autopilot_publisher._load_patch_metadata", mock_load_metadata):
             result = autopilot_publish_one()
-
+        
         assert result["ok"] is True
         assert result["reason"] == "no_patch_generated"
-
+        
     @patch("src.contrib_center.autopilot_publisher._load_autopilot_config")
     @patch("src.contrib_center.autopilot_publisher._load_published_prs")
     @patch("src.contrib_center.autopilot_publisher._load_patch_metadata")
@@ -453,9 +562,9 @@ class TestAutopilotPublishOne:
         mock_load_config.return_value = {"enabled": True, "max_external_prs_per_day": 1}
         mock_load_prs.return_value = []
         mock_load_metadata.return_value = []
-
+        
         result = autopilot_publish_one()
-
+        
         assert result["ok"] is True
         assert result["published"] is False
         assert result["reason"] == "no_patch_generated"

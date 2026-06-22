@@ -595,5 +595,86 @@ class TestDryRunNoPatchSource:
         assert result.skipped_reason == "patch_source_missing"
 
 
+class TestDryRunPatchFileNotFile:
+    """Dry-run with patch_file being a directory should return accurate reason."""
+
+    @patch("contrib_center.external_pr_publisher.guard_external_public_repo_read")
+    def test_patch_file_is_directory(self, mock_guard):
+        """Test that patch_file being a directory returns patch_file_not_file."""
+        mock_guard.return_value = MagicMock(public=True)
+        policy = _make_policy(mode="assisted")
+        
+        # Create a temporary directory and pass it as patch_file
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = dry_run_external_pr(
+                issue_url="https://github.com/owner/repo/issues/1",
+                upstream_repo="owner/repo",
+                patch_file=Path(tmpdir),  # This is a directory
+                pr_title="Test",
+                policy=policy,
+            )
+            assert result.ok is False
+            assert result.skipped_reason == "patch_file_not_file"
+
+
+class TestDryRunPatchFileNotDiff:
+    """Dry-run with patch_file not .diff should return accurate reason."""
+
+    @patch("contrib_center.external_pr_publisher.guard_external_public_repo_read")
+    def test_patch_file_not_diff_extension(self, mock_guard):
+        """Test that patch_file not .diff returns patch_file_not_diff."""
+        mock_guard.return_value = MagicMock(public=True)
+        policy = _make_policy(mode="assisted")
+        
+        # Create a temporary .txt file
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as f:
+            f.write(b"not a diff")
+            patch_file = Path(f.name)
+        
+        try:
+            result = dry_run_external_pr(
+                issue_url="https://github.com/owner/repo/issues/1",
+                upstream_repo="owner/repo",
+                patch_file=patch_file,
+                pr_title="Test",
+                policy=policy,
+            )
+            assert result.ok is False
+            assert result.skipped_reason == "patch_file_not_diff"
+        finally:
+            patch_file.unlink()
+
+
+class TestDryRunEmptyPatchFile:
+    """Dry-run with empty patch_file should return accurate reason."""
+
+    @patch("contrib_center.external_pr_publisher.guard_external_public_repo_read")
+    def test_empty_patch_file(self, mock_guard):
+        """Test that empty patch_file returns empty_patch."""
+        mock_guard.return_value = MagicMock(public=True)
+        policy = _make_policy(mode="assisted")
+        
+        # Create an empty .diff file
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".diff", delete=False) as f:
+            # Don't write anything - empty file
+            patch_file = Path(f.name)
+        
+        try:
+            result = dry_run_external_pr(
+                issue_url="https://github.com/owner/repo/issues/1",
+                upstream_repo="owner/repo",
+                patch_file=patch_file,
+                pr_title="Test",
+                policy=policy,
+            )
+            assert result.ok is False
+            assert result.skipped_reason == "empty_patch"
+        finally:
+            patch_file.unlink()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

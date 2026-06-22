@@ -60,6 +60,27 @@ class PatchResult:
 
 
 def _git_diff(workdir: Path) -> tuple[str, list[str]]:
+    # First, find untracked files (new files not yet staged)
+    untracked_proc = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard"],
+        cwd=workdir,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    untracked_files = [f for f in untracked_proc.stdout.splitlines() if f.strip()]
+
+    # Use git add -N to make git diff show new file content
+    if untracked_files:
+        subprocess.run(
+            ["git", "add", "-N", *untracked_files],
+            cwd=workdir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    # Generate diff (now includes untracked files)
     proc = subprocess.run(
         ["git", "diff", "--no-color", "--unified=3"],
         cwd=workdir,
@@ -68,6 +89,8 @@ def _git_diff(workdir: Path) -> tuple[str, list[str]]:
         check=False,
     )
     diff = proc.stdout
+    
+    # Get changed files (including untracked)
     files_proc = subprocess.run(
         ["git", "diff", "--name-only"],
         cwd=workdir,
@@ -76,6 +99,12 @@ def _git_diff(workdir: Path) -> tuple[str, list[str]]:
         check=False,
     )
     files = [f for f in files_proc.stdout.splitlines() if f.strip()]
+    
+    # Also add untracked files to changed_files if not already there
+    for f in untracked_files:
+        if f not in files:
+            files.append(f)
+    
     return diff, files
 
 
@@ -303,14 +332,7 @@ def generate_patch(
         patch_file_path = patches_dir / patch_filename
         metadata_file_path = patches_dir / metadata_filename
         
-        # Save diff to file
-        patch_file_path.write_text(diff, encoding="utf-8")
-        
-        # Update result with patch file paths
-        result.patch_file = str(patch_file_path)
-        result.patch_workdir = str(patches_dir)
-        
-        # Save metadata JSON
+        # Save metadata JSON (common fields)
         metadata = {
             "issue_url": issue_url,
             "repo": repo_full_name,
@@ -318,39 +340,68 @@ def generate_patch(
             "changed_files": files,
             "diff_lines": diff_lines,
             "tests_passed": result.tests_passed,
-            "patch_file": str(patch_file_path),
+            "patch_generated": result.patch_generated,  # Add patch_generated field
             "pr_title": result.pr_title,
             "pr_body": result.pr_body,
             "generated_at": datetime.now().isoformat(),
         }
-        metadata_file_path.write_text(
-            json.dumps(metadata, indent=2, ensure_ascii=False),
-            encoding="utf-8"
-        )
         
-        # Also log to patch_drafts.jsonl
+        # Only write patch file and metadata if patch was generated
+        if result.patch_generated:
+            # Save diff to file
+            patch_file_path.write_text(diff, encoding="utf-8")
+            
+            # Update result with patch file paths
+            result.patch_file = str(patch_file_path)
+            result.patch_workdir = str(patches_dir)
+            
+            # Add patch_file to metadata
+            metadata["patch_file"] = str(patch_file_path)
+            metadata["publishable"] = True
+            
+            # Save metadata JSON
+            metadata_file_path.write_text(
+                json.dumps(metadata, indent=2, ensure_ascii=False),
+                encoding="utf-8"
+            )
+            
+            logger.log_action(
+                "patch_persisted",
+                repo=repo_full_name,
+                issue=issue_url,
+                files=len(files),
+                diff_lines=diff_lines,
+                patch_file=str(patch_file_path),
+            )
+        else:
+            # Patch not generated (empty diff)
+            # Write a failure record to patch_drafts.jsonl, but NOT to data/patches/YYYY-MM-DD/
+            metadata["patch_generated"] = False
+            metadata["publishable"] = False
+            metadata["skip_reason"] = "empty_patch"
+            
+            logger.log_action(
+                "patch_not_generated",
+                repo=repo_full_name,
+                issue=issue_url,
+                reason="empty_patch",
+            )
+        
+        # Always log to patch_drafts.jsonl (for reporting)
         patch_drafts_path = Path("data/patch_drafts.jsonl")
         with open(patch_drafts_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(metadata, ensure_ascii=False) + "\n")
         
-        logger.log_action(
-            "patch_persisted",
-            repo=repo_full_name,
-            issue=issue_url,
-            files=len(files),
-            diff_lines=diff_lines,
-            patch_file=str(patch_file_path),
-        )
-        
-        # Also save to temp output dir for backward compatibility
-        diff_path = out_dir / "patch.diff"
-        diff_path.write_text(diff, encoding="utf-8")
-        logger.log_action(
-            "patch_generated",
-            repo=repo_full_name,
-            issue=issue_url,
-            files=len(files),
-            diff_lines=diff_lines,
-        )
+        # Also save to temp output dir for backward compatibility (only if patch generated)
+        if result.patch_generated:
+            diff_path = out_dir / "patch.diff"
+            diff_path.write_text(diff, encoding="utf-8")
+            logger.log_action(
+                "patch_generated",
+                repo=repo_full_name,
+                issue=issue_url,
+                files=len(files),
+                diff_lines=diff_lines,
+            )
 
     return result

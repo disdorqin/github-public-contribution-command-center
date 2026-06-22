@@ -162,7 +162,7 @@ def _issue_already_published(issue_url: str, published: list[dict]) -> bool:
 
 def _is_safe_candidate(metadata: dict, config: dict, policy: Policy) -> tuple[bool, str]:
     """Check if a candidate is safe to publish.
-
+    
     Returns (is_safe, reject_reason).
     """
     # Check deny keywords in issue URL or repo
@@ -179,10 +179,34 @@ def _is_safe_candidate(metadata: dict, config: dict, policy: Policy) -> tuple[bo
     if metadata.get("score", 0) < min_score:
         return False, "score_too_low"
 
-    # Check patch file exists
+    # Check patch_generated
+    if config.get("require_patch_generated", True):
+        if metadata.get("patch_generated") is not True:
+            return False, "patch_not_generated"
+
+    # Check patch file exists and is valid
     patch_file = metadata.get("patch_file", "")
-    if not patch_file or not Path(patch_file).exists():
+    if not patch_file:
         return False, "patch_file_missing"
+
+    patch_path = Path(patch_file)
+    if not patch_path.exists():
+        return False, "patch_file_missing"
+
+    if not patch_path.is_file():
+        return False, "patch_file_not_file"
+
+    if patch_path.suffix != ".diff":
+        return False, "patch_file_not_diff"
+
+    # Check if patch file is empty
+    try:
+        patch_content = patch_path.read_text(encoding="utf-8").strip()
+    except Exception:
+        return False, "patch_file_read_error"
+    
+    if not patch_content:
+        return False, "empty_patch"
 
     # Check diff limits
     if config.get("require_diff_limits", True):
