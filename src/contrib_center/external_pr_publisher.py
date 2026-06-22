@@ -279,11 +279,12 @@ def publish_external_pr(
         policy = Policy.load()
 
     # Step 0: Validate mode
-    if policy.mode != "assisted":
+    # Allow assisted and autopilot modes, reject safe mode
+    if policy.mode not in ("assisted", "autopilot"):
         return PublishResult(
             ok=False,
             upstream_repo=upstream_repo,
-            skipped_reason="safe_mode_blocks_external_pr",
+            skipped_reason="mode_blocks_external_pr",
         )
     if not confirm_publish:
         return PublishResult(
@@ -557,15 +558,85 @@ def publish_external_pr(
         # Step 7: Run tests (best-effort)
         # Detect project type and run appropriate tests
         test_rc = None
-        for test_cmd in [
-            ["pytest", "-x", "-q"],
-            ["npm", "test"],
-            ["cargo", "test"],
-            ["go", "test", "./..."],
-        ]:
-            if (clone_dir / "pytest.ini").exists() or (clone_dir / "setup.py").exists():
-                test_rc, _, _ = _run_cmd(test_cmd, cwd=str(clone_dir), timeout=300)
-                break
+        test_output = ""
+        tests_passed = None
+
+        # Detect project type
+        is_python = (
+            (clone_dir / "pytest.ini").exists() or
+            (clone_dir / "pyproject.toml").exists() or
+            (clone_dir / "setup.py").exists() or
+            (clone_dir / "requirements.txt").exists()
+        )
+        is_jsts = (clone_dir / "package.json").exists()
+        is_rust = (clone_dir / "Cargo.toml").exists()
+        is_go = (clone_dir / "go.mod").exists()
+
+        if is_python:
+            # Run pytest
+            test_rc, test_output, _ = _run_cmd(
+                ["pytest", "-x", "-q"],
+                cwd=str(clone_dir),
+                timeout=300
+            )
+            tests_passed = (test_rc == 0)
+        elif is_jsts:
+            # Check if pnpm is used
+            if (clone_dir / "pnpm-lock.yaml").exists():
+                test_rc, test_output, _ = _run_cmd(
+                    ["pnpm", "test"],
+                    cwd=str(clone_dir),
+                    timeout=300
+                )
+            else:
+                test_rc, test_output, _ = _run_cmd(
+                    ["npm", "test"],
+                    cwd=str(clone_dir),
+                    timeout=300
+                )
+            tests_passed = (test_rc == 0)
+        elif is_rust:
+            # Run cargo test
+            test_rc, test_output, _ = _run_cmd(
+                ["cargo", "test"],
+                cwd=str(clone_dir),
+                timeout=300
+            )
+            tests_passed = (test_rc == 0)
+        elif is_go:
+            # Run go test
+            test_rc, test_output, _ = _run_cmd(
+                ["go", "test", "./..."],
+                cwd=str(clone_dir),
+                timeout=300
+            )
+            tests_passed = (test_rc == 0)
+        else:
+            # No test framework detected
+            tests_passed = None  # not_available
+
+        # Check test results
+        if test_rc is not None:
+            if test_rc == 124:
+                # Timeout
+                return PublishResult(
+                    ok=False,
+                    upstream_repo=upstream_repo,
+                    fork_repo=fork_repo,
+                    branch=branch,
+                    error="Tests timed out",
+                    skipped_reason="tests_timeout",
+                )
+            elif test_rc != 0:
+                # Tests failed
+                return PublishResult(
+                    ok=False,
+                    upstream_repo=upstream_repo,
+                    fork_repo=fork_repo,
+                    branch=branch,
+                    error=f"Tests failed: {test_output[:200]}",
+                    skipped_reason="tests_failed",
+                )
 
         # Step 8: Commit
         commit_msg = f"fix: address issue #{issue_number}\n\nReference: {issue_url}"
@@ -652,11 +723,34 @@ def _build_pr_body(pr_title: str, pr_body: str, issue_url: str, stats: dict) -> 
     config = _load_external_config()
     pr_config = config.get("pr_body", {})
 
+    # Check for promotional content
+    forbidden_promotional = [
+        "please star",
+        "star this repo",
+        "follow me",
+        "promotion",
+        "check my project",
+        "star the repo",
+        "please follow",
+    ]
+
+    # Filter out promotional content from pr_body
+    filtered_pr_body = pr_body
+    for forbidden in forbidden_promotional:
+        if forbidden.lower() in (filtered_pr_body or "").lower():
+            # Remove the line containing promotional content
+            lines = (filtered_pr_body or "").split("\n")
+            filtered_lines = []
+            for line in lines:
+                if forbidden.lower() not in line.lower():
+                    filtered_lines.append(line)
+            filtered_pr_body = "\n".join(filtered_lines)
+
     body_parts = []
 
     # Summary
     body_parts.append("## Summary")
-    body_parts.append(pr_body or pr_title)
+    body_parts.append(filtered_pr_body or pr_title)
     body_parts.append("")
 
     # Linked issue
@@ -668,6 +762,13 @@ def _build_pr_body(pr_title: str, pr_body: str, issue_url: str, stats: dict) -> 
     # Tests
     if pr_config.get("include_test_summary", True):
         body_parts.append("## Tests")
+        tests_status = stats.get("tests_passed", None)
+        if tests_status is True:
+            body_parts.append("- Tests passed")
+        elif tests_status is False:
+            body_parts.append("- Tests failed (patch may need review)")
+        else:
+            body_parts.append("- Tests not available")
         body_parts.append(f"- Changed files: {stats.get('num_changed_files', 'N/A')}")
         body_parts.append(f"- Diff lines: {stats.get('diff_lines', 'N/A')}")
         body_parts.append("")
@@ -676,17 +777,19 @@ def _build_pr_body(pr_title: str, pr_body: str, issue_url: str, stats: dict) -> 
     if pr_config.get("include_safety_summary", True):
         body_parts.append("## Safety")
         body_parts.append("- [x] Public repo verified")
+        body_parts.append("- [x] Public issue verified")
         body_parts.append("- [x] No private/internal repo access")
-        body_parts.append("- [x] No credential/security/payment/auth issue handled")
+        body_parts.append("- [x] No security/auth/payment/credential issue handled")
         body_parts.append("- [x] Diff within configured limits")
+        body_parts.append("- [x] No external issue/comment/star automation")
         body_parts.append("")
 
     # Disclosure
     if pr_config.get("include_ai_assisted_notice", True):
         body_parts.append("## Disclosure")
         body_parts.append(
-            "This PR was prepared with AI assistance and reviewed by the automation "
-            "safety gates before submission."
+            "This PR was prepared with AI assistance and submitted by an automated "
+            "contribution workflow with strict safety gates."
         )
 
     return "\n".join(body_parts)
@@ -695,13 +798,24 @@ def _build_pr_body(pr_title: str, pr_body: str, issue_url: str, stats: dict) -> 
 def dry_run_external_pr(
     issue_url: str,
     upstream_repo: str,
-    patch_workdir: Path,
-    pr_title: str,
+    patch_workdir: Path | None = None,
+    patch_file: Path | None = None,
+    pr_title: str = "",
     policy: Policy | None = None,
 ) -> PublishResult:
     """Dry-run mode: validate all checks without publishing.
 
+    Supports two input modes:
+      1. patch_workdir: Validate git diff in the workdir
+      2. patch_file: Validate .diff file
+
     Useful for testing the full pipeline safely.
+
+    Dry-run only validates, does not:
+      - Fork the repo
+      - Clone fork
+      - Push to fork
+      - Create PR
     """
     if policy is None:
         policy = Policy.load()
@@ -741,9 +855,60 @@ def dry_run_external_pr(
         except json.JSONDecodeError:
             pass
 
-    # Validate patch limits (if patch_workdir exists)
+    # Validate patch_file or patch_workdir
     stats = {}
-    if patch_workdir and patch_workdir.exists():
+
+    # Check patch_file first (higher priority)
+    if patch_file and patch_file.exists():
+        # Validate patch_file
+        if not patch_file.is_file():
+            return PublishResult(
+                ok=False,
+                upstream_repo=upstream_repo,
+                fork_repo=fork_repo,
+                error=f"patch_file is not a file: {patch_file}",
+                skipped_reason="patch_file_not_file",
+            )
+
+        if patch_file.suffix != ".diff":
+            return PublishResult(
+                ok=False,
+                upstream_repo=upstream_repo,
+                fork_repo=fork_repo,
+                error=f"patch_file must have .diff extension: {patch_file}",
+                skipped_reason="patch_file_not_diff",
+            )
+
+        diff_content = patch_file.read_text(encoding="utf-8")
+        if not diff_content.strip():
+            return PublishResult(
+                ok=False,
+                upstream_repo=upstream_repo,
+                fork_repo=fork_repo,
+                error=f"patch_file is empty: {patch_file}",
+                skipped_reason="empty_patch",
+            )
+
+        # For patch_file, we can't validate patch limits without applying
+        # Just record basic stats
+        stats = {
+            "ok": True,
+            "patch_file": str(patch_file),
+            "patch_source": "patch_file",
+        }
+
+    # Check patch_workdir (lower priority)
+    elif patch_workdir and patch_workdir.exists():
+        if not patch_workdir.is_dir():
+            return PublishResult(
+                ok=False,
+                upstream_repo=upstream_repo,
+                fork_repo=fork_repo,
+                error=f"patch_workdir is not a directory: {patch_workdir}",
+                skipped_reason="patch_workdir_not_dir",
+            )
+
+        # Validate patch limits
         stats = _validate_patch_limits(patch_workdir)
         if not stats["ok"]:
             return PublishResult(
@@ -754,6 +919,16 @@ def dry_run_external_pr(
                 skipped_reason="patch_limits_exceeded",
                 patch_stats=stats,
             )
+
+    else:
+        # Neither patch_file nor patch_workdir available
+        return PublishResult(
+            ok=False,
+            upstream_repo=upstream_repo,
+            fork_repo=fork_repo,
+            error="No patch source available (patch_file or patch_workdir required)",
+            skipped_reason="patch_source_missing",
+        )
 
     # Dry-run success
     logger.log_action(

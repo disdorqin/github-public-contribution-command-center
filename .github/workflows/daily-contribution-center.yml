@@ -115,7 +115,7 @@ jobs:
           git config user.name "github-public-contribution-bot"
           git config user.email "actions@github.com"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git add reports/ data/*.jsonl data/*.sqlite 2>/dev/null || true
+          git add reports/ data/*.jsonl data/*.sqlite data/patches/ 2>/dev/null || true
           git diff --cached --quiet && echo "nothing to commit" && exit 0
           git commit -m "chore: update daily public contribution report [skip ci]"
           git push origin main 2>&1

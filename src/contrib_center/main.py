@@ -125,9 +125,31 @@ def _cmd_assisted_pr(
                         "skipped_reason": "patch_file_missing",
                     }, indent=2))
                     return 1
+                if not patch_path.is_file():
+                    print(json.dumps({
+                        "ok": False,
+                        "error": f"patch_file is not a file: {patch_file}",
+                        "skipped_reason": "patch_file_not_file",
+                    }, indent=2))
+                    return 1
+                if patch_path.suffix != ".diff":
+                    print(json.dumps({
+                        "ok": False,
+                        "error": f"patch_file must have .diff extension: {patch_file}",
+                        "skipped_reason": "patch_file_not_diff",
+                    }, indent=2))
+                    return 1
+                diff_content = patch_path.read_text(encoding="utf-8")
+                if not diff_content.strip():
+                    print(json.dumps({
+                        "ok": False,
+                        "error": f"patch_file is empty: {patch_file}",
+                        "skipped_reason": "empty_patch",
+                    }, indent=2))
+                    return 1
 
             # Check patch_workdir if provided (and patch_file not provided)
-            if not patch_file and patch_workdir:
+            elif patch_workdir:
                 patch_path = Path(patch_workdir)
                 if not patch_path.exists():
                     print(json.dumps({
@@ -136,22 +158,38 @@ def _cmd_assisted_pr(
                         "skipped_reason": "patch_workdir_missing",
                     }, indent=2))
                     return 1
+                if not patch_path.is_dir():
+                    print(json.dumps({
+                        "ok": False,
+                        "error": f"patch_workdir is not a directory: {patch_workdir}",
+                        "skipped_reason": "patch_workdir_not_dir",
+                    }, indent=2))
+                    return 1
 
-            # Check if there's an actual diff
-            proc = subprocess.run(
-                ["git", "diff"],
-                capture_output=True,
-                text=True,
-                check=False,
-                cwd=str(patch_path),
-            )
-            rc = proc.returncode
-            out = proc.stdout
-            if rc != 0 or not out.strip():
+                # Check if there's an actual diff
+                proc = subprocess.run(
+                    ["git", "diff"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    cwd=str(patch_path),
+                )
+                rc = proc.returncode
+                out = proc.stdout
+                if rc != 0 or not out.strip():
+                    print(json.dumps({
+                        "ok": False,
+                        "error": "No diff found in patch_workdir",
+                        "skipped_reason": "empty_patch",
+                    }, indent=2))
+                    return 1
+
+            else:
+                # Neither patch_file nor patch_workdir provided
                 print(json.dumps({
                     "ok": False,
-                    "error": "No diff found in patch_workdir",
-                    "skipped_reason": "empty_patch",
+                    "error": "--patch-file or --patch-workdir is required when --confirm-publish=true",
+                    "skipped_reason": "patch_source_missing",
                 }, indent=2))
                 return 1
 
@@ -243,7 +281,7 @@ def _cmd_assisted_pr(
         return 1
 
 
-def _cmd_autopilot_publish(dry_run: bool = False) -> int:
+def _cmd_autopilot_publish(mode: str, dry_run: bool = False) -> int:
     """Handle autopilot-publish command."""
     try:
         import json
@@ -253,12 +291,15 @@ def _cmd_autopilot_publish(dry_run: bool = False) -> int:
 
         policy = Policy.load()
 
+        # Override policy.mode with CLI argument
+        policy.mode = mode
+
         if policy.mode != "autopilot":
             print(json.dumps({
                 "ok": False,
-                "error": "autopilot-publish requires mode=autopilot",
+                "error": "autopilot-publish requires --mode autopilot",
                 "current_mode": policy.mode,
-                "hint": "Run with: python -m contrib_center.main run --mode autopilot",
+                "hint": "Use: --mode autopilot",
             }, indent=2))
             return 1
 
@@ -331,6 +372,12 @@ def main(argv: list[str] | None = None) -> int:
     # Autopilot publish command
     p_autopilot = sub.add_parser("autopilot-publish")
     p_autopilot.add_argument(
+        "--mode",
+        default="safe",
+        choices=["safe", "autopilot"],
+        help="Mode: safe (default) or autopilot",
+    )
+    p_autopilot.add_argument(
         "--dry-run",
         action="store_true",
         help="Dry-run mode (no actual PR published)",
@@ -363,7 +410,7 @@ def main(argv: list[str] | None = None) -> int:
             args.patch_file,
         )
     if args.cmd == "autopilot-publish":
-        return _cmd_autopilot_publish(args.dry_run)
+        return _cmd_autopilot_publish(args.mode, args.dry_run)
     if args.cmd == "check-visibility":
         return _cmd_check_visibility(args.repo)
     return 1
