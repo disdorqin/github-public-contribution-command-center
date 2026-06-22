@@ -26,7 +26,7 @@ def _gh(args: list[str], timeout: int = 60) -> tuple[int, str, str]:
     proc = subprocess.run(
         ["gh", *args],
         capture_output=True,
-        text=True,
+        encoding="utf-8",  # Force UTF-8 encoding
         timeout=timeout,
         check=False,
     )
@@ -38,8 +38,8 @@ def auth_status() -> dict[str, Any]:
     return {
         "available": shutil.which("gh") is not None,
         "logged_in": rc == 0,
-        "stderr": err.strip(),
-        "stdout": out.strip(),
+        "stderr": err.strip() if err else "",
+        "stdout": out.strip() if out else "",
     }
 
 

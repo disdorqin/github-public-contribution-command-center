@@ -329,6 +329,9 @@ def autopilot_publish_one(
     issue_url = selected.get("issue_url", "")
     repo = selected.get("repo", "")
     patch_file = Path(selected.get("patch_file", ""))
+    # Resolve to absolute path to avoid relative path issues
+    if not patch_file.is_absolute():
+        patch_file = patch_file.resolve()
     pr_title = selected.get("pr_title", f"Fix issue for {repo}")
     pr_body = selected.get("pr_body", f"Address issue: {issue_url}")
 
