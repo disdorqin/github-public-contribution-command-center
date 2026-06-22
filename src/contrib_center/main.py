@@ -303,15 +303,8 @@ def _cmd_autopilot_publish(mode: str, dry_run: bool = False) -> int:
             }, indent=2))
             return 1
 
-        if dry_run:
-            print(json.dumps({
-                "ok": True,
-                "dry_run": True,
-                "message": "Dry run - no PR will be published",
-            }, indent=2))
-            return 0
-
-        result = autopilot_publish_one(policy)
+        # Always call autopilot_publish_one with dry_run parameter
+        result = autopilot_publish_one(policy, dry_run=dry_run)
 
         print(json.dumps(result, indent=2, default=str))
         return 0 if result.get("ok") else 1

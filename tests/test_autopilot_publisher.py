@@ -569,6 +569,161 @@ class TestAutopilotPublishOne:
         assert result["published"] is False
         assert result["reason"] == "no_patch_generated"
 
+    @patch("src.contrib_center.autopilot_publisher.guard_external_public_repo_read")
+    @patch("src.contrib_center.autopilot_publisher._load_autopilot_config")
+    @patch("src.contrib_center.autopilot_publisher._load_patch_metadata")
+    @patch("src.contrib_center.autopilot_publisher._load_published_prs")
+    @patch("src.contrib_center.autopilot_publisher.dry_run_external_pr")
+    def test_dry_run_calls_dry_run_external_pr(self, mock_dry_run, mock_load_prs, mock_load_metadata, mock_load_config, mock_guard):
+        """Test that dry_run=True calls dry_run_external_pr instead of publish_external_pr."""
+        mock_guard.return_value = True
+        mock_load_config.return_value = {"enabled": True, "max_external_prs_per_day": 1}
+
+        mock_load_prs.return_value = []
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        mock_load_metadata.return_value = [
+            {
+                "repo": "owner/repo",
+                "issue_url": "https://github.com/owner/repo/issues/1",
+                "score": 8.5,
+                "patch_generated": True,
+                "patch_file": "/tmp/patch.diff",
+                "changed_files": ["README.md"],
+                "diff_lines": 10,
+            }
+        ]
+
+        mock_dry_run.return_value = PublishResult(
+            ok=True,
+            upstream_repo="owner/repo",
+            fork_repo="disdorqin/repo",
+            branch="contrib-center/repo/1-abc123",
+            pr_url=None,
+            skipped_reason="dry_run_only",
+            patch_stats={"ok": True},
+        )
+
+        # Mock Path.exists()
+        with patch("pathlib.Path.exists", return_value=True):
+            with patch("pathlib.Path.is_file", return_value=True):
+                with patch("pathlib.Path.read_text", return_value="diff --git a/file.txt b/file.txt\n"):
+                    result = autopilot_publish_one(dry_run=True)
+
+        assert result["ok"] is True
+        assert result["published"] is False
+        assert result["dry_run"] is True
+        assert "repo" in result
+        assert "issue_url" in result
+        assert "patch_file" in result
+        assert result["pr_url"] is None
+        mock_dry_run.assert_called_once()
+
+    @patch("src.contrib_center.autopilot_publisher.guard_external_public_repo_read")
+    @patch("src.contrib_center.autopilot_publisher._load_autopilot_config")
+    @patch("src.contrib_center.autopilot_publisher._load_patch_metadata")
+    @patch("src.contrib_center.autopilot_publisher._load_published_prs")
+    def test_dry_run_does_not_call_publish_external_pr(self, mock_load_prs, mock_load_metadata, mock_load_config, mock_guard):
+        """Test that dry_run=True does NOT call publish_external_pr."""
+        mock_guard.return_value = True
+        mock_load_config.return_value = {"enabled": True, "max_external_prs_per_day": 1}
+
+        mock_load_prs.return_value = []
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        mock_load_metadata.return_value = [
+            {
+                "repo": "owner/repo",
+                "issue_url": "https://github.com/owner/repo/issues/1",
+                "score": 8.5,
+                "patch_generated": True,
+                "patch_file": "/tmp/patch.diff",
+                "changed_files": ["README.md"],
+                "diff_lines": 10,
+            }
+        ]
+
+        # Ensure publish_external_pr is not called
+        with patch("src.contrib_center.autopilot_publisher.publish_external_pr") as mock_publish:
+            with patch("pathlib.Path.exists", return_value=True):
+                with patch("pathlib.Path.is_file", return_value=True):
+                    with patch("pathlib.Path.read_text", return_value="diff --git a/file.txt b/file.txt\n"):
+                        result = autopilot_publish_one(dry_run=True)
+
+            # publish_external_pr should NOT be called
+            mock_publish.assert_not_called()
+
+        assert result["dry_run"] is True
+
+    @patch("src.contrib_center.autopilot_publisher.guard_external_public_repo_read")
+    @patch("src.contrib_center.autopilot_publisher._load_autopilot_config")
+    @patch("src.contrib_center.autopilot_publisher._load_patch_metadata")
+    @patch("src.contrib_center.autopilot_publisher._load_published_prs")
+    def test_dry_run_does_not_write_published_prs(self, mock_load_prs, mock_load_metadata, mock_load_config, mock_guard):
+        """Test that dry_run=True does NOT write to data/published_prs.jsonl."""
+        mock_guard.return_value = True
+        mock_load_config.return_value = {"enabled": True, "max_external_prs_per_day": 1}
+
+        mock_load_prs.return_value = []
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        mock_load_metadata.return_value = [
+            {
+                "repo": "owner/repo",
+                "issue_url": "https://github.com/owner/repo/issues/1",
+                "score": 8.5,
+                "patch_generated": True,
+                "patch_file": "/tmp/patch.diff",
+                "changed_files": ["README.md"],
+                "diff_lines": 10,
+            }
+        ]
+
+        # Ensure published_prs.jsonl is not written
+        with patch("builtins.open", create=True) as mock_open:
+            with patch("pathlib.Path.exists", return_value=True):
+                with patch("pathlib.Path.is_file", return_value=True):
+                    with patch("pathlib.Path.read_text", return_value="diff --git a/file.txt b/file.txt\n"):
+                        result = autopilot_publish_one(dry_run=True)
+
+            # open should not be called for writing published_prs.jsonl
+            # (it might be called for reading, but not for appending)
+            write_calls = [call for call in mock_open.call_args_list if "a" in str(call)]
+            assert len(write_calls) == 0
+
+        assert result["dry_run"] is True
+
+    @patch("src.contrib_center.autopilot_publisher._load_autopilot_config")
+    @patch("src.contrib_center.autopilot_publisher._load_published_prs")
+    @patch("src.contrib_center.autopilot_publisher._load_patch_metadata")
+    def test_no_safe_candidate_returns_reason(self, mock_load_metadata, mock_load_prs, mock_load_config):
+        """Test that no safe candidate returns real reason, not exception."""
+        mock_load_config.return_value = {"enabled": True, "max_external_prs_per_day": 1, "min_score": 7.0}
+        mock_load_prs.return_value = []
+
+        # Return metadata with low score (not safe)
+        mock_load_metadata.return_value = [
+            {
+                "repo": "owner/repo",
+                "issue_url": "https://github.com/owner/repo/issues/1",
+                "score": 5.0,  # Too low
+                "patch_generated": True,
+                "patch_file": "/tmp/patch.diff",
+            }
+        ]
+
+        with patch("src.contrib_center.autopilot_publisher.guard_external_public_repo_read"):
+            with patch("pathlib.Path.exists", return_value=True):
+                with patch("pathlib.Path.is_file", return_value=True):
+                    with patch("pathlib.Path.read_text", return_value="diff --git a/file.txt b/file.txt\n"):
+                        result = autopilot_publish_one(dry_run=True)
+
+        # Should return reason, not raise exception
+        assert result["ok"] is True
+        assert result["published"] is False
+        assert "reason" in result
+        assert result["reason"] == "score_too_low"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

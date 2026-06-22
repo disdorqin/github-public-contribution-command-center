@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from . import logger
-from .external_pr_publisher import PublishResult, publish_external_pr
+from .external_pr_publisher import PublishResult, publish_external_pr, dry_run_external_pr
 from .policy import Policy, _load
 from .visibility_guard import PermissionError_, guard_external_public_repo_read
 
@@ -235,17 +235,30 @@ def _is_safe_candidate(metadata: dict, config: dict, policy: Policy) -> tuple[bo
 # ---------------------------------------------------------------------------
 
 
-def autopilot_publish_one(policy: Policy | None = None) -> dict:
+def autopilot_publish_one(
+    policy: Policy | None = None,
+    dry_run: bool = False,
+) -> dict:
     """Attempt to publish one external PR using autopilot mode.
+
+    Args:
+        policy: Policy object. If None, loads from policy.yml.
+        dry_run: If True, run full validation but do not publish.
 
     Returns dict with:
       - ok: bool
       - published: bool
+      - dry_run: bool (True if dry_run)
       - reason: str (if not published)
-      - repo: str (if published)
-      - issue_url: str (if published)
+      - repo: str (if candidate selected)
+      - issue_url: str (if candidate selected)
       - pr_url: str (if published)
       - error: str (if failed)
+      - fork_repo: str (if dry_run and candidate selected)
+      - branch: str (if dry_run and candidate selected)
+      - patch_file: str (if candidate selected)
+      - skipped_reason: str (if failed)
+      - patch_stats: dict (if dry_run and candidate selected)
     """
     if policy is None:
         policy = Policy.load()
@@ -329,7 +342,35 @@ def autopilot_publish_one(policy: Policy | None = None) -> dict:
             tests_summary=tests_summary,
         )
 
-    # Call external_pr_publisher
+    # Branch: dry_run vs real publish
+    if dry_run:
+        # Dry-run: call dry_run_external_pr, do NOT publish
+
+        result = dry_run_external_pr(
+            issue_url=issue_url,
+            upstream_repo=repo,
+            patch_file=patch_file,
+            pr_title=pr_title,
+            policy=policy,
+        )
+
+        return {
+            "ok": result.ok,
+            "published": False,
+            "dry_run": True,
+            "repo": repo,
+            "issue_url": issue_url,
+            "patch_file": str(patch_file),
+            "fork_repo": result.fork_repo,
+            "branch": result.branch,
+            "pr_url": None,
+            "error": result.error,
+            "skipped_reason": result.skipped_reason,
+            "patch_stats": result.patch_stats,
+            "selected": True,
+        }
+
+    # Real publish: call publish_external_pr
     result = publish_external_pr(
         issue_url=issue_url,
         upstream_repo=repo,

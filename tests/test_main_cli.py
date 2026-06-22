@@ -94,17 +94,65 @@ class TestAutopilotPublishCLI:
 
     @patch("src.contrib_center.autopilot_publisher.autopilot_publish_one")
     @patch("src.contrib_center.main.Policy")
-    def test_dry_run_no_publish(self, mock_policy, mock_autopilot):
-        """Test that dry-run doesn't publish."""
+    def test_dry_run_calls_autopilot_publish_one(self, mock_policy, mock_autopilot):
+        """Test that dry-run now calls autopilot_publish_one (not early return)."""
         mock_policy_instance = MagicMock()
         mock_policy_instance.mode = "autopilot"
         mock_policy.return_value = mock_policy_instance
         mock_policy.load.return_value = mock_policy_instance
 
+        mock_autopilot.return_value = {
+            "ok": True,
+            "published": False,
+            "dry_run": True,
+            "repo": "owner/repo",
+            "issue_url": "https://github.com/owner/repo/issues/1",
+            "patch_file": "/tmp/patch.diff",
+            "fork_repo": "disdorqin/repo",
+            "branch": "contrib-center/repo/1-abc123",
+            "pr_url": None,
+            "skipped_reason": "dry_run_only",
+            "patch_stats": {"ok": True},
+            "selected": True,
+        }
+
         result = _cmd_autopilot_publish(mode="autopilot", dry_run=True)
 
         assert result == 0
-        mock_autopilot.assert_not_called()
+        mock_autopilot.assert_called_once()
+        # Verify dry_run=True was passed
+        call_kwargs = mock_autopilot.call_args
+        assert call_kwargs[1]["dry_run"] is True
+
+    @patch("src.contrib_center.autopilot_publisher.autopilot_publish_one")
+    @patch("src.contrib_center.main.Policy")
+    def test_dry_run_returns_full_output(self, mock_policy, mock_autopilot):
+        """Test that dry-run returns full output (not just message)."""
+        mock_policy_instance = MagicMock()
+        mock_policy_instance.mode = "autopilot"
+        mock_policy.return_value = mock_policy_instance
+        mock_policy.load.return_value = mock_policy_instance
+
+        mock_autopilot.return_value = {
+            "ok": True,
+            "published": False,
+            "dry_run": True,
+            "repo": "owner/repo",
+            "issue_url": "https://github.com/owner/repo/issues/1",
+            "patch_file": "/tmp/patch.diff",
+            "fork_repo": "disdorqin/repo",
+            "branch": "contrib-center/repo/1-abc123",
+            "pr_url": None,
+            "skipped_reason": "dry_run_only",
+            "patch_stats": {"ok": True},
+            "selected": True,
+        }
+
+        result = _cmd_autopilot_publish(mode="autopilot", dry_run=True)
+
+        assert result == 0
+        # Verify that autopilot_publish_one was called (not early return)
+        mock_autopilot.assert_called_once()
 
     @patch("src.contrib_center.autopilot_publisher.autopilot_publish_one")
     @patch("src.contrib_center.main.Policy")
