@@ -58,8 +58,20 @@ class PublishResult:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _run_cmd(cmd: list[str], cwd: str | None = None, timeout: int = 120) -> tuple[int, str, str]:
-    """Run a shell command, return (rc, stdout, stderr)."""
+def _run_cmd(
+    cmd: list[str],
+    cwd: str | None = None,
+    timeout: int = 120,
+    input_text: str | None = None,
+) -> tuple[int, str, str]:
+    """Run a shell command, return (rc, stdout, stderr).
+
+    Args:
+        cmd: Command and arguments.
+        cwd: Working directory.
+        timeout: Timeout in seconds.
+        input_text: Text to pass to stdin (requires text=True).
+    """
     try:
         proc = subprocess.run(
             cmd,
@@ -69,6 +81,7 @@ def _run_cmd(cmd: list[str], cwd: str | None = None, timeout: int = 120) -> tupl
             check=False,
             cwd=cwd,
             env=os.environ.copy(),
+            input=input_text,  # text=True means input should be str, not bytes
         )
     except subprocess.TimeoutExpired:
         return (124, "", f"Command timed out after {timeout}s")
@@ -114,6 +127,8 @@ def _check_deny_keywords(title: str, body: str) -> list[str]:
 def _validate_patch_limits(patch_workdir: Path) -> dict[str, Any]:
     """Validate patch against configured limits.
 
+    Checks both staged (--cached) and unstaged changes.
+
     Returns dict with:
       - ok: bool
       - changed_files: list[str]
@@ -131,8 +146,23 @@ def _validate_patch_limits(patch_workdir: Path) -> dict[str, Any]:
     forbid_generated = limits.get("forbid_generated_files", True)
 
     errors = []
-    rc, stdout, stderr = _run_cmd(["git", "diff", "--name-only"], cwd=str(patch_workdir))
-    changed_files = stdout.strip().splitlines() if rc == 0 else []
+
+    # Check both staged and unstaged changes
+    # Staged: git diff --cached
+    # Unstaged: git diff
+    changed_files = []
+
+    # Get staged files
+    rc_cache, stdout_cache, _ = _run_cmd(["git", "diff", "--cached", "--name-only"], cwd=str(patch_workdir))
+    if rc_cache == 0 and stdout_cache.strip():
+        changed_files.extend(stdout_cache.strip().splitlines())
+
+    # Get unstaged files
+    rc_unstaged, stdout_unstaged, _ = _run_cmd(["git", "diff", "--name-only"], cwd=str(patch_workdir))
+    if rc_unstaged == 0 and stdout_unstaged.strip():
+        for f in stdout_unstaged.strip().splitlines():
+            if f not in changed_files:
+                changed_files.append(f)
 
     # Check binary files
     binary_files = []
@@ -149,11 +179,24 @@ def _validate_patch_limits(patch_workdir: Path) -> dict[str, Any]:
                 except Exception:
                     binary_files.append(f)  # Treat unreadable as binary
 
-    # Count diff lines
-    rc2, out2, _ = _run_cmd(["git", "diff", "--numstat"], cwd=str(patch_workdir))
+    # Count diff lines (staged + unstaged)
     diff_lines = 0
+
+    # Staged diff
+    rc2, out2, _ = _run_cmd(["git", "diff", "--cached", "--numstat"], cwd=str(patch_workdir))
     if rc2 == 0:
         for line in out2.strip().splitlines():
+            parts = line.split("\t")
+            if len(parts) >= 2:
+                try:
+                    diff_lines += int(parts[0]) + int(parts[1])
+                except ValueError:
+                    pass
+
+    # Unstaged diff
+    rc3, out3, _ = _run_cmd(["git", "diff", "--numstat"], cwd=str(patch_workdir))
+    if rc3 == 0:
+        for line in out3.strip().splitlines():
             parts = line.split("\t")
             if len(parts) >= 2:
                 try:
@@ -236,6 +279,15 @@ def publish_external_pr(
             ok=False,
             upstream_repo=upstream_repo,
             skipped_reason="confirm_publish_not_set",
+        )
+
+    # Step 0.5: Validate patch_workdir exists (ONLY if confirm_publish=True)
+    if confirm_publish and (not patch_workdir or not patch_workdir.exists()):
+        return PublishResult(
+            ok=False,
+            upstream_repo=upstream_repo,
+            error="patch_workdir does not exist",
+            skipped_reason="patch_workdir_missing",
         )
 
     config = _load_external_config()
@@ -342,23 +394,60 @@ def publish_external_pr(
             )
 
         # Step 5: Apply patch
-        if patch_workdir and patch_workdir.exists():
-            # Copy changed files from patch_workdir to clone_dir
-            rc_diff, diff_out, _ = _run_cmd(
-                ["git", "diff"], cwd=str(patch_workdir)
-            )
-            if rc_diff == 0 and diff_out.strip():
-                # Apply diff
-                rc_apply, _, err_apply = _run_cmd(
-                    ["git", "apply"],
-                    cwd=str(clone_dir),
-                    input=diff_out,  # This won't work directly; need to use stdin
-                )
-                # Actually, let's copy files directly
-                # This is a simplified approach - in practice, use git diff + apply
-                pass
+        # (patch_workdir already validated at Step 0.5)
 
-        # Step 6: Validate patch limits
+        # Generate diff from patch_workdir
+        rc_diff, diff_out, err_diff = _run_cmd(
+            ["git", "diff"], cwd=str(patch_workdir)
+        )
+        if rc_diff != 0:
+            return PublishResult(
+                ok=False,
+                upstream_repo=upstream_repo,
+                fork_repo=fork_repo,
+                branch=branch,
+                error=err_diff[:300],
+                skipped_reason="patch_diff_failed",
+            )
+
+        # Check if diff is empty
+        if not diff_out.strip():
+            return PublishResult(
+                ok=False,
+                upstream_repo=upstream_repo,
+                fork_repo=fork_repo,
+                branch=branch,
+                skipped_reason="empty_patch",
+            )
+
+        # Apply diff to clone_dir
+        rc_apply, _, err_apply = _run_cmd(
+            ["git", "apply", "--index"],
+            cwd=str(clone_dir),
+            input_text=diff_out,
+        )
+        if rc_apply != 0:
+            # Try without --index as fallback
+            rc_apply2, _, err_apply2 = _run_cmd(
+                ["git", "apply"],
+                cwd=str(clone_dir),
+                input_text=diff_out,
+            )
+            if rc_apply2 != 0:
+                return PublishResult(
+                    ok=False,
+                    upstream_repo=upstream_repo,
+                    fork_repo=fork_repo,
+                    branch=branch,
+                    error=f"git apply failed: {err_apply2[:200]}",
+                    skipped_reason="patch_apply_failed",
+                )
+
+        # Step 6: Validate patch limits (check staged or unstaged changes)
+        # First, stage all applied changes
+        _run_cmd(["git", "add", "-A"], cwd=str(clone_dir))
+
+        # Validate against limits
         stats = _validate_patch_limits(clone_dir)
         if not stats["ok"]:
             return PublishResult(

@@ -74,12 +74,18 @@ def _cmd_llm_check() -> int:
         return 1
 
 
-def _cmd_assisted_pr(target_issue_url: str, confirm_publish: bool, dry_run: bool = False) -> int:
+def _cmd_assisted_pr(
+    target_issue_url: str,
+    confirm_publish: bool,
+    dry_run: bool = False,
+    patch_workdir: str | None = None,
+) -> int:
     """Handle assisted-pr command for external PR publishing."""
     try:
         from .external_pr_publisher import publish_external_pr, dry_run_external_pr
         from .policy import Policy
         from pathlib import Path
+        import subprocess
 
         policy = Policy.load()
 
@@ -90,6 +96,41 @@ def _cmd_assisted_pr(target_issue_url: str, confirm_publish: bool, dry_run: bool
                 "current_mode": policy.mode,
             }, indent=2))
             return 1
+
+        # Validate patch_workdir
+        if confirm_publish and not dry_run:
+            if not patch_workdir:
+                print(json.dumps({
+                    "ok": False,
+                    "error": "--patch-workdir is required when --confirm-publish=true",
+                    "hint": "Use --dry-run to validate without publishing",
+                }, indent=2))
+                return 1
+
+            patch_path = Path(patch_workdir)
+            if not patch_path.exists():
+                print(json.dumps({
+                    "ok": False,
+                    "error": f"patch_workdir does not exist: {patch_workdir}",
+                    "skipped_reason": "patch_workdir_missing",
+                }, indent=2))
+                return 1
+
+            # Check if there's an actual diff
+            rc, out, _ = subprocess.run(
+                ["git", "diff"],
+                capture_output=True,
+                text=True,
+                check=False,
+                cwd=str(patch_path),
+            )
+            if rc != 0 or not out.strip():
+                print(json.dumps({
+                    "ok": False,
+                    "error": "No diff found in patch_workdir",
+                    "skipped_reason": "empty_patch",
+                }, indent=2))
+                return 1
 
         # Extract upstream repo from issue URL
         # URL format: https://github.com/OWNER/REPO/issues/NUMBER
@@ -104,12 +145,10 @@ def _cmd_assisted_pr(target_issue_url: str, confirm_publish: bool, dry_run: bool
 
         upstream_repo = f"{parts[-4]}/{parts[-3]}"
 
-        # Determine patch_workdir (use a default temp dir for now)
-        # In practice, this should come from mini-swe-agent output
-        patch_workdir = Path("data/patches")  # Placeholder
+        # Determine patch_workdir
+        patch_path = Path(patch_workdir) if patch_workdir else None
 
         # Generate PR title and body
-        import subprocess
         rc, out, _ = subprocess.run(
             ["gh", "issue", "view", target_issue_url, "--json", "title,body"],
             capture_output=True,
@@ -132,7 +171,7 @@ def _cmd_assisted_pr(target_issue_url: str, confirm_publish: bool, dry_run: bool
             result = dry_run_external_pr(
                 issue_url=target_issue_url,
                 upstream_repo=upstream_repo,
-                patch_workdir=patch_workdir,
+                patch_workdir=patch_path,
                 pr_title=pr_title,
                 policy=policy,
             )
@@ -140,7 +179,7 @@ def _cmd_assisted_pr(target_issue_url: str, confirm_publish: bool, dry_run: bool
             result = publish_external_pr(
                 issue_url=target_issue_url,
                 upstream_repo=upstream_repo,
-                patch_workdir=patch_workdir,
+                patch_workdir=patch_path,
                 pr_title=pr_title,
                 pr_body=pr_body,
                 policy=policy,
@@ -205,6 +244,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Dry-run mode (no actual PR created)",
     )
+    p_assisted_pr.add_argument(
+        "--patch-workdir",
+        default=None,
+        help="Path to directory containing git diff (required for real publish)",
+    )
 
     p_check = sub.add_parser("check-visibility")
     p_check.add_argument("repo")
@@ -224,7 +268,12 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_llm_check()
     if args.cmd == "assisted-pr":
         confirm = args.confirm_publish == "true"
-        return _cmd_assisted_pr(args.target_issue_url, confirm, args.dry_run)
+        return _cmd_assisted_pr(
+            args.target_issue_url,
+            confirm,
+            args.dry_run,
+            args.patch_workdir,
+        )
     if args.cmd == "check-visibility":
         return _cmd_check_visibility(args.repo)
     return 1
