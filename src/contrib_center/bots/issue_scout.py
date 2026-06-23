@@ -54,8 +54,15 @@ class Candidate:
 def _extract_repo(issue: dict) -> str:
     repo = issue.get("repository") or {}
     if isinstance(repo, dict):
+        # Try different field names for owner
         owner = repo.get("owner") or repo.get("ownerLogin") or ""
         name = repo.get("name") or ""
+        
+        # Try nameWithOwner format (e.g., "owner/repo")
+        name_with_owner = repo.get("nameWithOwner") or ""
+        if "/" in name_with_owner:
+            return name_with_owner
+        
         if owner and name:
             return f"{owner}/{name}"
     return ""

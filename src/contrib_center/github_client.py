@@ -12,6 +12,7 @@ routes through the appropriate public-only guard.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from typing import Any
@@ -29,6 +30,7 @@ def _gh(args: list[str], timeout: int = 60) -> tuple[int, str, str]:
         encoding="utf-8",  # Force UTF-8 encoding
         timeout=timeout,
         check=False,
+        env=os.environ,  # Pass proxy and other env vars to subprocess
     )
     return (proc.returncode, proc.stdout, proc.stderr)
 
@@ -52,11 +54,13 @@ def search_issues(query: str, limit: int = 30) -> list[dict[str, Any]]:
     Note: ``gh search issues --json`` does NOT support the ``body`` field.
     Callers should use ``get_issue_body()`` to fetch the full body when needed.
     """
+    # Split query into individual words to avoid quoting issues with gh CLI
+    query_words = query.split()
     rc, out, err = _gh(
         [
             "search",
             "issues",
-            query,
+            *query_words,
             "--limit",
             str(limit),
             "--state",

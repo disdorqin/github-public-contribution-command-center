@@ -1,7 +1,7 @@
 queries:
-  - 'is:issue is:open label:"good first issue" language:Python'
-  - 'is:issue is:open label:"documentation" language:Python'
-  - 'is:issue is:open label:"bug" language:Python'
-  - 'is:issue is:open label:"help wanted" machine learning'
-  - 'is:issue is:open label:"good first issue" power systems'
-  - 'is:issue is:open label:"documentation" energy'
+  - 'is:issue is:open label:good-first-issue language:Python'
+  - 'is:issue is:open label:documentation language:Python'
+  - 'is:issue is:open label:bug language:Python'
+  - 'is:issue is:open label:help-wanted machine-learning'
+  - 'is:issue is:open label:good-first-issue power-systems'
+  - 'is:issue is:open label:documentation energy'

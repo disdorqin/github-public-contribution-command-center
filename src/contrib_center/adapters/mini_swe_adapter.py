@@ -143,6 +143,9 @@ def _build_llm_env() -> dict[str, str]:
     Returns an environment dict with LLM provider settings injected.
     """
     env = {**os.environ}
+    
+    # Suppress mini-swe-agent startup message to avoid Unicode errors on Windows
+    env["MSWEA_SILENT_STARTUP"] = "1"
 
     # Try to get LLM config from llm_router if available
     try:

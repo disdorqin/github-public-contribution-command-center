@@ -34,7 +34,7 @@ END_MARK = "<!-- DAILY-BOT:END -->"
 def _clone_profile_repo(full_name: str, workdir: Path) -> bool:
     """Shallow-clone the profile repo so we can edit its README."""
     if workdir.exists():
-        shutil.rmtree(workdir)
+        shutil.rmtree(workdir, ignore_errors=True)
     workdir.parent.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run(
         [
