@@ -19,8 +19,8 @@ on:
         default: ""
         type: string
   schedule:
-    # 09:00 Asia/Singapore == 01:00 UTC
-    - cron: "0 1 * * *"
+    # 08:00 Asia/Singapore == 00:00 UTC
+    - cron: "0 0 * * *"
 
 permissions:
   contents: write
@@ -38,7 +38,7 @@ jobs:
 
       # Environment variable to control whether cron can run autopilot
       # Set this in GitHub repository variables (Settings > Variables)
-      ALLOW_CRON_AUTOPILOT: ${{ vars.ALLOW_CRON_AUTOPILOT || 'false' }}
+      ALLOW_CRON_AUTOPILOT: ${{ vars.ALLOW_CRON_AUTOPILOT || 'true' }}
 
       GH_TOKEN: ${{ secrets.PUBLIC_GITHUB_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.PUBLIC_GITHUB_TOKEN }}

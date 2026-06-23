@@ -341,7 +341,11 @@ class TestRunCmdInputText:
         """Test that _run_cmd works without input_text."""
         from contrib_center.external_pr_publisher import _run_cmd
 
-        rc, stdout, _ = _run_cmd(["echo", "hello"])
+        import sys
+        if sys.platform == "win32":
+            rc, stdout, _ = _run_cmd([sys.executable, "-c", "print('hello')"])
+        else:
+            rc, stdout, _ = _run_cmd(["echo", "hello"])
         assert rc == 0
         assert "hello" in stdout
 
