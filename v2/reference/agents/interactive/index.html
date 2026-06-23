@@ -2920,7 +2920,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">rich.rule</span><span class="w"> </span><span class="kn">import</span> <span class="n">Rule</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">minisweagent.agents.default</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentConfig</span><span class="p">,</span> <span class="n">DefaultAgent</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">minisweagent.agents.utils.prompt_user</span><span class="w"> </span><span class="kn">import</span> <span class="n">_multiline_prompt</span><span class="p">,</span> <span class="n">prompt_session</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">minisweagent.agents.utils.prompt_user</span><span class="w"> </span><span class="kn">import</span> <span class="n">_multiline_prompt</span><span class="p">,</span> <span class="n">_get_prompt_session</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">minisweagent.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">LimitsExceeded</span><span class="p">,</span> <span class="n">Submitted</span><span class="p">,</span> <span class="n">TimeExceeded</span><span class="p">,</span> <span class="n">UserInterruption</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">minisweagent.models.utils.content_string</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_content_string</span>
 
@@ -3092,7 +3092,7 @@
         <span class="n">console</span><span class="o">.</span><span class="n">print</span><span class="p">(</span><span class="n">prompt</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="s2">""</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">_multiline</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">_multiline_prompt</span><span class="p">()</span>
-        <span class="n">user_input</span> <span class="o">=</span> <span class="n">prompt_session</span><span class="o">.</span><span class="n">prompt</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span>
+        <span class="n">user_input</span> <span class="o">=</span> <span class="n">_get_prompt_session</span><span class="p">()</span><span class="o">.</span><span class="n">prompt</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">user_input</span> <span class="o">==</span> <span class="s2">"/m"</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prompt_and_handle_slash_commands</span><span class="p">(</span><span class="n">prompt</span><span class="p">,</span> <span class="n">_multiline</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">user_input</span> <span class="o">==</span> <span class="s2">"/h"</span><span class="p">:</span>
