@@ -1,0 +1,529 @@
+diff --git a/.github/ISSUE_TEMPLATE/bug.md b/.github/ISSUE_TEMPLATE/bug.md
+index f2ad5dd..8dd9e47 100644
+--- a/.github/ISSUE_TEMPLATE/bug.md
++++ b/.github/ISSUE_TEMPLATE/bug.md
+@@ -1,23 +1,23 @@
+----
+-name: "Reporte de error"
+-about: "Reportar un comportamiento incorrecto"
+-labels: "bug"
+----
+-
+-## Descripción del error
+-
+-## Pasos para reproducirlo
+-1.
+-2.
+-3.
+-
+-## Comportamiento esperado
+-
+-## Comportamiento actual
+-
+-## Entorno
+-- OS:
+-- Versión del proyecto:
+-
+-## Evidencia
++---
++name: "Reporte de error"
++about: "Reportar un comportamiento incorrecto"
++labels: "bug"
++---
++
++## Descripción del error
++
++## Pasos para reproducirlo
++1.
++2.
++3.
++
++## Comportamiento esperado
++
++## Comportamiento actual
++
++## Entorno
++- OS:
++- Versión del proyecto:
++
++## Evidencia
+ [Capturas, logs]
+\ No newline at end of file
+diff --git a/.github/ISSUE_TEMPLATE/chore.md b/.github/ISSUE_TEMPLATE/chore.md
+index f77b93d..2e77e3c 100644
+--- a/.github/ISSUE_TEMPLATE/chore.md
++++ b/.github/ISSUE_TEMPLATE/chore.md
+@@ -1,14 +1,14 @@
+----
+-name: "Configuración / DevOps"
+-about: "CI/CD, dependencias, configuración"
+-labels: "chore"
+----
+-
+-## Descripción
+-
+-## Criterios de aceptación
+-- [ ]
+-- [ ]
+-
+-## Rama sugerida
++---
++name: "Configuración / DevOps"
++about: "CI/CD, dependencias, configuración"
++labels: "chore"
++---
++
++## Descripción
++
++## Criterios de aceptación
++- [ ]
++- [ ]
++
++## Rama sugerida
+ `chore/nombre-descriptivo`
+\ No newline at end of file
+diff --git a/.github/ISSUE_TEMPLATE/data.md b/.github/ISSUE_TEMPLATE/data.md
+index 0f44ce6..bbddedd 100644
+--- a/.github/ISSUE_TEMPLATE/data.md
++++ b/.github/ISSUE_TEMPLATE/data.md
+@@ -1,19 +1,19 @@
+----
+-name: "Análisis de datos"
+-about: "Análisis de métricas del proyecto"
+-labels: "data"
+----
+-
+-## ¿Qué se quiere analizar?
+-
+-## Fuente de datos
+-- [ ] Métricas de GitHub
+-- [ ] Logs del sistema
+-- [ ] Resultados de tests
+-- [ ] Otra:
+-
+-## Entregable esperado
+-Reporte / gráfica / dashboard en `data/analysis/`
+-
+-## Rama sugerida
++---
++name: "Análisis de datos"
++about: "Análisis de métricas del proyecto"
++labels: "data"
++---
++
++## ¿Qué se quiere analizar?
++
++## Fuente de datos
++- [ ] Métricas de GitHub
++- [ ] Logs del sistema
++- [ ] Resultados de tests
++- [ ] Otra:
++
++## Entregable esperado
++Reporte / gráfica / dashboard en `data/analysis/`
++
++## Rama sugerida
+ `data/nombre-descriptivo`
+\ No newline at end of file
+diff --git a/.github/ISSUE_TEMPLATE/docs.md b/.github/ISSUE_TEMPLATE/docs.md
+index 081791a..acf8599 100644
+--- a/.github/ISSUE_TEMPLATE/docs.md
++++ b/.github/ISSUE_TEMPLATE/docs.md
+@@ -1,17 +1,17 @@
+----
+-name: "Documentación"
+-about: "Agregar o mejorar documentación"
+-labels: "docs"
+----
+-
+-## ¿Qué documentación falta o está incorrecta?
+-
+-## ¿Dónde debería estar?
+-`docs/nombre-del-archivo.md`
+-
+-## Criterios de aceptación
+-- [ ]
+-- [ ]
+-
+-## Rama sugerida
++---
++name: "Documentación"
++about: "Agregar o mejorar documentación"
++labels: "docs"
++---
++
++## ¿Qué documentación falta o está incorrecta?
++
++## ¿Dónde debería estar?
++`docs/nombre-del-archivo.md`
++
++## Criterios de aceptación
++- [ ]
++- [ ]
++
++## Rama sugerida
+ `docs/nombre-descriptivo`
+\ No newline at end of file
+diff --git a/.github/ISSUE_TEMPLATE/feature.md b/.github/ISSUE_TEMPLATE/feature.md
+index 721650b..59b9d34 100644
+--- a/.github/ISSUE_TEMPLATE/feature.md
++++ b/.github/ISSUE_TEMPLATE/feature.md
+@@ -1,21 +1,21 @@
+----
+-name: "Nueva funcionalidad"
+-about: "Proponer una nueva característica"
+-labels: "feat"
+----
+-
+-## Descripción
+-¿Qué funcionalidad se propone?
+-
+-## Motivación
+-¿Qué problema resuelve?
+-
+-## Criterios de aceptación
+-- [ ]
+-- [ ]
+-- [ ]
+-
+-## Rama sugerida
+-`feat/nombre-descriptivo`
+-
++---
++name: "Nueva funcionalidad"
++about: "Proponer una nueva característica"
++labels: "feat"
++---
++
++## Descripción
++¿Qué funcionalidad se propone?
++
++## Motivación
++¿Qué problema resuelve?
++
++## Criterios de aceptación
++- [ ]
++- [ ]
++- [ ]
++
++## Rama sugerida
++`feat/nombre-descriptivo`
++
+ ## Notas adicionales
+\ No newline at end of file
+diff --git a/.github/ISSUE_TEMPLATE/security.md b/.github/ISSUE_TEMPLATE/security.md
+index 210ee37..b7c6845 100644
+--- a/.github/ISSUE_TEMPLATE/security.md
++++ b/.github/ISSUE_TEMPLATE/security.md
+@@ -1,20 +1,20 @@
+----
+-name: "Seguridad"
+-about: "Análisis o mejora de seguridad"
+-labels: "security"
+----
+-
+-## Descripción
+-
+-## Tipo
+-- [ ] Análisis de vulnerabilidades
+-- [ ] Configuración de herramienta
+-- [ ] Política de seguridad
+-- [ ] Corrección de vulnerabilidad
+-
+-## Criterios de aceptación
+-- [ ]
+-- [ ]
+-
+-## Rama sugerida
++---
++name: "Seguridad"
++about: "Análisis o mejora de seguridad"
++labels: "security"
++---
++
++## Descripción
++
++## Tipo
++- [ ] Análisis de vulnerabilidades
++- [ ] Configuración de herramienta
++- [ ] Política de seguridad
++- [ ] Corrección de vulnerabilidad
++
++## Criterios de aceptación
++- [ ]
++- [ ]
++
++## Rama sugerida
+ `security/nombre-descriptivo`
+\ No newline at end of file
+diff --git a/.github/ISSUE_TEMPLATE/test.md b/.github/ISSUE_TEMPLATE/test.md
+index 32af8b9..c9e4fa4 100644
+--- a/.github/ISSUE_TEMPLATE/test.md
++++ b/.github/ISSUE_TEMPLATE/test.md
+@@ -1,21 +1,21 @@
+----
+-name: "Testing"
+-about: "Agregar o mejorar pruebas"
+-labels: "test"
+----
+-
+-## ¿Qué se debe probar?
+-
+-## Tipo de prueba
+-- [ ] Unitaria
+-- [ ] Integración
+-- [ ] Manual
+-- [ ] Rendimiento
+-- [ ] Seguridad
+-
+-## Criterios de aceptación
+-- [ ] Las pruebas pasan en CI
+-- [ ] La cobertura no disminuye
+-
+-## Rama sugerida
++---
++name: "Testing"
++about: "Agregar o mejorar pruebas"
++labels: "test"
++---
++
++## ¿Qué se debe probar?
++
++## Tipo de prueba
++- [ ] Unitaria
++- [ ] Integración
++- [ ] Manual
++- [ ] Rendimiento
++- [ ] Seguridad
++
++## Criterios de aceptación
++- [ ] Las pruebas pasan en CI
++- [ ] La cobertura no disminuye
++
++## Rama sugerida
+ `test/nombre-descriptivo`
+\ No newline at end of file
+diff --git a/.github/PULL_REQUEST_TEMPLATE.md b/.github/PULL_REQUEST_TEMPLATE.md
+index f564df9..7c32b2a 100644
+--- a/.github/PULL_REQUEST_TEMPLATE.md
++++ b/.github/PULL_REQUEST_TEMPLATE.md
+@@ -1,23 +1,23 @@
+-## ¿Qué hace este PR?
+-
+-
+-## Issue relacionado
+-Closes #
+-
+-## Tipo de cambio
+-- [ ] feat — nueva funcionalidad
+-- [ ] fix — corrección de error
+-- [ ] docs — documentación
+-- [ ] test — pruebas
+-- [ ] chore — configuración
+-- [ ] refactor — mejora sin cambio funcional
+-- [ ] security — seguridad
+-- [ ] data — análisis de datos
+-
+-## Checklist
+-- [ ] Mi código sigue los estándares del proyecto
+-- [ ] Actualicé la documentación correspondiente
+-- [ ] Mis cambios no rompen funcionalidad existente
+-- [ ] Agregué tests si corresponde
+-
++## ¿Qué hace este PR?
++
++
++## Issue relacionado
++Closes #
++
++## Tipo de cambio
++- [ ] feat — nueva funcionalidad
++- [ ] fix — corrección de error
++- [ ] docs — documentación
++- [ ] test — pruebas
++- [ ] chore — configuración
++- [ ] refactor — mejora sin cambio funcional
++- [ ] security — seguridad
++- [ ] data — análisis de datos
++
++## Checklist
++- [ ] Mi código sigue los estándares del proyecto
++- [ ] Actualicé la documentación correspondiente
++- [ ] Mis cambios no rompen funcionalidad existente
++- [ ] Agregué tests si corresponde
++
+ ## Evidencia / capturas
+\ No newline at end of file
+diff --git a/tests/plan/criterios-de-salida.md b/tests/plan/criterios-de-salida.md
+index 97c0b41..d42040f 100644
+--- a/tests/plan/criterios-de-salida.md
++++ b/tests/plan/criterios-de-salida.md
+@@ -1,10 +1,10 @@
+-# Criterios de Salida
+-
+-## Para pasar de dev a main
+-
+-- [ ] Cobertura de tests >= ___%
+-- [ ] Cero bugs de severidad Crítica o Alta abiertos
+-- [ ] Todos los casos de prueba del sprint ejecutados
+-- [ ] Informe de pruebas generado y aprobado
+-- [ ] Revisión de seguridad completada
++# Criterios de Salida
++
++## Para pasar de dev a main
++
++- [ ] Cobertura de tests >= ___%
++- [ ] Cero bugs de severidad Crítica o Alta abiertos
++- [ ] Todos los casos de prueba del sprint ejecutados
++- [ ] Informe de pruebas generado y aprobado
++- [ ] Revisión de seguridad completada
+ - [ ] Documentación actualizada
+\ No newline at end of file
+diff --git a/tests/plan/estrategia.md b/tests/plan/estrategia.md
+index d308e27..1c26f59 100644
+--- a/tests/plan/estrategia.md
++++ b/tests/plan/estrategia.md
+@@ -1,28 +1,28 @@
+-# Estrategia de Pruebas
+-
+-## Enfoque general
+-
+-## Niveles de prueba
+-
+-### Pruebas unitarias
+-- Herramienta:
+-- Cobertura mínima:
+-- Responsable:
+-
+-### Pruebas de integración
+-- Herramienta:
+-- Alcance:
+-- Responsable:
+-
+-### Pruebas manuales
+-- Frecuencia:
+-- Responsable:
+-
+-## Criterios de priorización de bugs
+-
+-| Severidad | Descripción | Tiempo de resolución |
+-|---|---|---|
+-| Crítico | El sistema no funciona | Inmediato |
+-| Alto | Funcionalidad principal afectada | 24 horas |
+-| Medio | Funcionalidad secundaria afectada | 1 semana |
++# Estrategia de Pruebas
++
++## Enfoque general
++
++## Niveles de prueba
++
++### Pruebas unitarias
++- Herramienta:
++- Cobertura mínima:
++- Responsable:
++
++### Pruebas de integración
++- Herramienta:
++- Alcance:
++- Responsable:
++
++### Pruebas manuales
++- Frecuencia:
++- Responsable:
++
++## Criterios de priorización de bugs
++
++| Severidad | Descripción | Tiempo de resolución |
++|---|---|---|
++| Crítico | El sistema no funciona | Inmediato |
++| Alto | Funcionalidad principal afectada | 24 horas |
++| Medio | Funcionalidad secundaria afectada | 1 semana |
+ | Bajo | Problema cosmético | Siguiente sprint |
+\ No newline at end of file
+diff --git a/tests/reportes/plantilla-reporte.md b/tests/reportes/plantilla-reporte.md
+index e81ebd4..17e4ce6 100644
+--- a/tests/reportes/plantilla-reporte.md
++++ b/tests/reportes/plantilla-reporte.md
+@@ -1,41 +1,41 @@
+-# Informe de Pruebas — Sprint [N]
+-
+-**Fecha:** 
+-**Versión probada:** 
+-**Responsable QA:** 
+-
+----
+-
+-## Resumen ejecutivo
+-
+-
+-## Métricas
+-
+-| Métrica | Valor |
+-|---|---|
+-| Casos diseñados | |
+-| Casos ejecutados | |
+-| Casos pasados | |
+-| Casos fallidos | |
+-| Bugs encontrados | |
+-| Bugs resueltos | |
+-| Cobertura de código | |
+-
+-## Resultados por módulo
+-
+-| Módulo | Casos | Pasaron | Fallaron | Cobertura |
+-|---|---|---|---|---|
+-| | | | | |
+-
+-## Bugs críticos abiertos
+-
+-| Issue | Descripción | Severidad |
+-|---|---|---|
+-| | | |
+-
+-## Conclusión
+-
+-
+-## ¿Listo para siguiente sprint?
+-- [ ] Sí
++# Informe de Pruebas — Sprint [N]
++
++**Fecha:** 
++**Versión probada:** 
++**Responsable QA:** 
++
++---
++
++## Resumen ejecutivo
++
++
++## Métricas
++
++| Métrica | Valor |
++|---|---|
++| Casos diseñados | |
++| Casos ejecutados | |
++| Casos pasados | |
++| Casos fallidos | |
++| Bugs encontrados | |
++| Bugs resueltos | |
++| Cobertura de código | |
++
++## Resultados por módulo
++
++| Módulo | Casos | Pasaron | Fallaron | Cobertura |
++|---|---|---|---|---|
++| | | | | |
++
++## Bugs críticos abiertos
++
++| Issue | Descripción | Severidad |
++|---|---|---|
++| | | |
++
++## Conclusión
++
++
++## ¿Listo para siguiente sprint?
++- [ ] Sí
+ - [ ] No — razón:
+\ No newline at end of file
