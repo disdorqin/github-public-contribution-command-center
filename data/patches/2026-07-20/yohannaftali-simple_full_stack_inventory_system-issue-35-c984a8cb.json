@@ -1,0 +1,16 @@
+{
+  "issue_url": "https://github.com/yohannaftali/simple_full_stack_inventory_system/issues/35",
+  "repo": "yohannaftali/simple_full_stack_inventory_system",
+  "score": 7.8428571428571425,
+  "changed_files": [
+    "frontend/setup_env.sh"
+  ],
+  "diff_lines": 122,
+  "tests_passed": false,
+  "patch_generated": true,
+  "pr_title": "[contrib-center] candidate patch for yohannaftali/simple_full_stack_inventory_system",
+  "pr_body": "Auto-generated draft from the public contribution center.\n\n- Issue: https://github.com/yohannaftali/simple_full_stack_inventory_system/issues/35\n- Score: 7.84\n- Mode: safe\n- Tests passed: False\n\nNOTE: This PR was NOT published. It is a draft for human review.\n",
+  "generated_at": "2026-07-20T11:23:45.784791",
+  "patch_file": "data/patches/2026-07-20/yohannaftali-simple_full_stack_inventory_system-issue-35-c984a8cb.diff",
+  "publishable": true
+}
