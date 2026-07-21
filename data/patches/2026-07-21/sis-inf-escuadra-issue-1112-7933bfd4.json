@@ -1,0 +1,26 @@
+{
+  "issue_url": "https://github.com/sis-inf/escuadra/issues/1112",
+  "repo": "sis-inf/escuadra",
+  "score": 8.092857142857143,
+  "changed_files": [
+    ".github/ISSUE_TEMPLATE/bug.md",
+    ".github/ISSUE_TEMPLATE/chore.md",
+    ".github/ISSUE_TEMPLATE/data.md",
+    ".github/ISSUE_TEMPLATE/docs.md",
+    ".github/ISSUE_TEMPLATE/feature.md",
+    ".github/ISSUE_TEMPLATE/security.md",
+    ".github/ISSUE_TEMPLATE/test.md",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    "tests/plan/criterios-de-salida.md",
+    "tests/plan/estrategia.md",
+    "tests/reportes/plantilla-reporte.md"
+  ],
+  "diff_lines": 437,
+  "tests_passed": false,
+  "patch_generated": true,
+  "pr_title": "[contrib-center] candidate patch for sis-inf/escuadra",
+  "pr_body": "Auto-generated draft from the public contribution center.\n\n- Issue: https://github.com/sis-inf/escuadra/issues/1112\n- Score: 8.09\n- Mode: safe\n- Tests passed: False\n\nNOTE: This PR was NOT published. It is a draft for human review.\n",
+  "generated_at": "2026-07-21T10:51:07.132054",
+  "patch_file": "data/patches/2026-07-21/sis-inf-escuadra-issue-1112-7933bfd4.diff",
+  "publishable": true
+}
